@@ -10,6 +10,8 @@ import (
 	"fmt"
 
 	"golang.org/x/sys/windows"
+
+	"github.com/telagem/agent-windows/internal/winfs/fsforensic"
 )
 
 // ErrUnsupported se mantiene por paridad con la build no-Windows (no debería
@@ -158,8 +160,8 @@ func readRecords(ctx context.Context, h windows.Handle, journalID uint64, parent
 			if !reasonIsRelevant(rec.Reason) {
 				continue
 			}
-			suspicious := isSuspiciousName(rec.FileName)
-			if !hasForensicExtension(rec.FileName) && !suspicious {
+			suspicious := fsforensic.IsSuspiciousName(rec.FileName)
+			if !fsforensic.HasForensicExtension(rec.FileName) && !suspicious {
 				continue
 			}
 			entries = append(entries, Entry{

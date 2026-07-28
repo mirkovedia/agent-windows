@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	"github.com/telagem/agent-windows/internal/winfs/fsforensic"
 )
 
 // TestReadJournalIntegration corre solo si hay acceso al journal (elevación).
@@ -20,7 +22,7 @@ func TestReadJournalIntegration(t *testing.T) {
 		if e.FullPath == "" {
 			t.Fatalf("entry sin FullPath: %+v", e)
 		}
-		if !hasForensicExtension(e.FileName) && !isSuspiciousName(e.FileName) {
+		if !fsforensic.HasForensicExtension(e.FileName) && !fsforensic.IsSuspiciousName(e.FileName) {
 			t.Fatalf("entry no pasó el filtro forense: %q", e.FileName)
 		}
 	}
