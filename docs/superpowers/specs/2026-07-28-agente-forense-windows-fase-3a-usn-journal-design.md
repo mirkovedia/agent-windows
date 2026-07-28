@@ -107,6 +107,9 @@ type Record struct {
 
 // parseRecord parsea un USN_RECORD_V2 o V3 desde un buffer. Devuelve el record
 // y cuántos bytes consumió (RecordLength) para avanzar al siguiente.
+// V2 usa referencias de 64 bits; V3 usa FILE_ID_128 — se truncan a los 64 bits
+// bajos, que en NTFS coinciden con el número de entrada MFT + secuencia. Se
+// prioriza V2 (el default de READ_USN_JOURNAL); V3 se detecta por MajorVersion==3.
 func parseRecord(buf []byte) (Record, int, error)
 
 // ParentEntry es una fila del mapa de rutas construido con ENUM_USN_DATA.
@@ -172,7 +175,7 @@ type Entry struct {
 ### `internal/collector/usn` — colector
 
 ```go
-type Collector struct { Volume string } // default `\\.\C:` (o "C:")
+type Collector struct { Volume string } // default `\\.\C:` (path del dispositivo de volumen)
 
 func New() *Collector
 func (c *Collector) Name() string  { return "usn" }
