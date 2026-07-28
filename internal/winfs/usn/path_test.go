@@ -1,0 +1,33 @@
+package usn
+
+import "testing"
+
+// rootRef simula el FileRef de la raíz del volumen (nº de entrada MFT 5).
+const testRootRef = 0x0005000000000005
+
+func TestResolvePathFull(t *testing.T) {
+	pm := map[uint64]ParentEntry{
+		100: {Name: "Users", ParentRef: testRootRef},
+		200: {Name: "Downloads", ParentRef: 100},
+	}
+	got := resolvePath(pm, 200, "cheat.exe")
+	want := `\Users\Downloads\cheat.exe`
+	if got != want {
+		t.Fatalf("resolvePath = %q, want %q", got, want)
+	}
+}
+
+func TestResolvePathMissingParent(t *testing.T) {
+	got := resolvePath(map[uint64]ParentEntry{}, 999, "evil.exe")
+	want := `\` + unresolvedPrefix + `\evil.exe`
+	if got != want {
+		t.Fatalf("resolvePath = %q, want %q", got, want)
+	}
+}
+
+func TestResolvePathAtRoot(t *testing.T) {
+	got := resolvePath(map[uint64]ParentEntry{}, testRootRef, "pagefile.sys")
+	if got != `\pagefile.sys` {
+		t.Fatalf("resolvePath = %q, want %q", got, `\pagefile.sys`)
+	}
+}
