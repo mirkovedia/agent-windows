@@ -32,13 +32,16 @@ type Record struct {
 // parseRecord parsea un USN_RECORD_V2 o V3 desde el inicio de buf. Devuelve el
 // record, cuántos bytes ocupa (RecordLength, para avanzar) y error. En versión
 // desconocida devuelve error PERO con el RecordLength correcto, para que el
-// llamador pueda saltear el record y continuar.
+// llamador pueda saltear el record y continuar. Si RecordLength es inválido,
+// devuelve n=0 (no se puede avanzar con seguridad).
 func parseRecord(buf []byte) (Record, int, error) {
 	if len(buf) < 4 {
 		return Record{}, 0, fmt.Errorf("buffer USN truncado: %d bytes", len(buf))
 	}
 	recLen := int(binary.LittleEndian.Uint32(buf[0:4]))
 	if recLen < 8 || recLen > len(buf) {
+		// No se puede avanzar: el campo RecordLength es inválido o no es confiable;
+		// devolvemos n=0 para que el llamador se detenga, ya que no es seguro saltear.
 		return Record{}, 0, fmt.Errorf("RecordLength inválido: %d", recLen)
 	}
 	major := binary.LittleEndian.Uint16(buf[4:6])
