@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/telagem/agent-windows/internal/winfs/compression"
+	"github.com/telagem/agent-windows/internal/winfs/wintime"
 )
 
 // Entry es un archivo Prefetch parseado.
@@ -71,7 +72,7 @@ func parsePrefetch(raw []byte) (Entry, error) {
 		if ft == 0 {
 			continue
 		}
-		e.LastRunTimes = append(e.LastRunTimes, filetimeToTime(ft))
+		e.LastRunTimes = append(e.LastRunTimes, wintime.FiletimeToTime(ft))
 	}
 	return e, nil
 }
@@ -89,11 +90,3 @@ func decodeUTF16(b []byte) string {
 	return sb.String()
 }
 
-// filetimeToTime convierte un FILETIME (100ns desde 1601) a time.Time UTC.
-func filetimeToTime(ft uint64) time.Time {
-	const ticksPerSecond = 10_000_000
-	const epochDiff = 11644473600 // segundos entre 1601 y 1970
-	secs := int64(ft)/ticksPerSecond - epochDiff
-	nsec := (int64(ft) % ticksPerSecond) * 100
-	return time.Unix(secs, nsec).UTC()
-}

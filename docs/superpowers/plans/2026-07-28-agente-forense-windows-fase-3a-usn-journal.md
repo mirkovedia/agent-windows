@@ -48,8 +48,8 @@ import (
 )
 
 func TestFiletimeToTimeKnownValue(t *testing.T) {
-	// 0x01D9B1DED53E8000 = 2023-03-13T00:00:00Z (FILETIME, 100ns desde 1601).
-	got := FiletimeToTime(0x01D9B1DED53E8000)
+	// 0x01D9553EC1174000 = 2023-03-13T00:00:00Z (FILETIME, 100ns desde 1601).
+	got := FiletimeToTime(0x01D9553EC1174000)
 	want := time.Date(2023, 3, 13, 0, 0, 0, 0, time.UTC)
 	if !got.Equal(want) {
 		t.Fatalf("FiletimeToTime = %s, want %s", got, want)
@@ -206,7 +206,7 @@ func buildV2(fileRef, parentRef uint64, usn int64, ft uint64, reason uint32, nam
 }
 
 func TestParseRecordV2(t *testing.T) {
-	buf := buildV2(0x1122, 0x3344, 42, 0x01D9B1DED53E8000, ReasonFileDelete, "cheat.exe")
+	buf := buildV2(0x1122, 0x3344, 42, 0x01D9553EC1174000, ReasonFileDelete, "cheat.exe")
 	rec, n, err := parseRecord(buf)
 	if err != nil {
 		t.Fatalf("parseRecord error: %v", err)
