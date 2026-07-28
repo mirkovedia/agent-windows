@@ -99,7 +99,7 @@ func enumParents(ctx context.Context, h windows.Handle) (map[uint64]ParentEntry,
 		if ret <= 8 {
 			break
 		}
-		// Los primeros 8 bytes son el próximo StartFileReferenceNumber.
+		// Los primeros 8 bytes son el NextFileReferenceNumber que siembra la siguiente llamada de enumeración.
 		next := binary.LittleEndian.Uint64(out[0:8])
 		pos := 8
 		for pos < int(ret) {
@@ -158,13 +158,14 @@ func readRecords(ctx context.Context, h windows.Handle, journalID uint64, parent
 			if !reasonIsRelevant(rec.Reason) {
 				continue
 			}
-			if !hasForensicExtension(rec.FileName) && !isSuspiciousName(rec.FileName) {
+			suspicious := isSuspiciousName(rec.FileName)
+			if !hasForensicExtension(rec.FileName) && !suspicious {
 				continue
 			}
 			entries = append(entries, Entry{
 				Record:     rec,
 				FullPath:   resolvePath(parentMap, rec.ParentRef, rec.FileName),
-				Suspicious: isSuspiciousName(rec.FileName),
+				Suspicious: suspicious,
 			})
 		}
 		if nextUsn == startUsn {
