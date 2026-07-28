@@ -6,6 +6,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"time"
+
+	"github.com/telagem/agent-windows/internal/winfs/wintime"
 )
 
 // Entry es un ejecutable visto por el sistema según ShimCache.
@@ -72,7 +74,7 @@ func parseWin10Record(rec []byte) (Entry, error) {
 	}
 	path := decodeUTF16(rec[2 : 2+pathLen])
 	ft := binary.LittleEndian.Uint64(rec[2+pathLen : 2+pathLen+8])
-	return Entry{Path: path, ModifiedTime: filetimeToTime(ft)}, nil
+	return Entry{Path: path, ModifiedTime: wintime.FiletimeToTime(ft)}, nil
 }
 
 func decodeUTF16(b []byte) string {
@@ -87,13 +89,3 @@ func decodeUTF16(b []byte) string {
 	return string(sb)
 }
 
-func filetimeToTime(ft uint64) time.Time {
-	if ft == 0 {
-		return time.Time{}
-	}
-	const ticksPerSecond = 10_000_000
-	const epochDiff = 11644473600
-	secs := int64(ft)/ticksPerSecond - epochDiff
-	nsec := (int64(ft) % ticksPerSecond) * 100
-	return time.Unix(secs, nsec).UTC()
-}

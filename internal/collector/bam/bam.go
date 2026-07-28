@@ -9,6 +9,7 @@ import (
 
 	"github.com/telagem/agent-windows/internal/collector"
 	"github.com/telagem/agent-windows/internal/winfs/reghive"
+	"github.com/telagem/agent-windows/internal/winfs/wintime"
 )
 
 // Entry es una ejecución registrada por BAM (Background Activity Moderator).
@@ -99,9 +100,5 @@ func decodeBAMValue(raw []byte) (time.Time, bool) {
 	if ft == 0 {
 		return time.Time{}, false
 	}
-	const ticksPerSecond = 10_000_000
-	const epochDiff = 11644473600
-	secs := int64(ft)/ticksPerSecond - epochDiff
-	nsec := (int64(ft) % ticksPerSecond) * 100
-	return time.Unix(secs, nsec).UTC(), true
+	return wintime.FiletimeToTime(ft), true
 }
