@@ -1,4 +1,8 @@
-/agent.exe
+# Binarios compilados
 *.exe
-*.test
-*.out
+
+# Fixtures de test (se regeneran; ver testdata/README.md)
+**/testdata/*.bin
+**/testdata/*.expected
+**/testdata/*.hve
+**/testdata/*.pf
