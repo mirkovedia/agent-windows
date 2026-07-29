@@ -10,6 +10,9 @@ import (
 	"fmt"
 
 	"golang.org/x/sys/windows"
+
+	"github.com/telagem/agent-windows/internal/winfs/fsforensic"
+	"github.com/telagem/agent-windows/internal/winfs/ntfspath"
 )
 
 // ErrUnsupported se mantiene por paridad con la build no-Windows (no debería
@@ -72,8 +75,8 @@ func queryJournal(h windows.Handle) (uint64, error) {
 }
 
 // enumParents recorre ENUM_USN_DATA acumulando FileRef -> {nombre, padre}.
-func enumParents(ctx context.Context, h windows.Handle) (map[uint64]ParentEntry, error) {
-	parentMap := make(map[uint64]ParentEntry)
+func enumParents(ctx context.Context, h windows.Handle) (map[uint64]ntfspath.ParentEntry, error) {
+	parentMap := make(map[uint64]ntfspath.ParentEntry)
 	// MFT_ENUM_DATA_V0: StartFileReferenceNumber(8) + LowUsn(8) + HighUsn(8).
 	in := make([]byte, 24)
 	binary.LittleEndian.PutUint64(in[8:16], 0)                   // LowUsn
@@ -108,7 +111,7 @@ func enumParents(ctx context.Context, h windows.Handle) (map[uint64]ParentEntry,
 				break
 			}
 			if perr == nil {
-				parentMap[rec.FileRef] = ParentEntry{Name: rec.FileName, ParentRef: rec.ParentRef}
+				parentMap[rec.FileRef] = ntfspath.ParentEntry{Name: rec.FileName, ParentRef: rec.ParentRef}
 			}
 			pos += n
 		}
@@ -118,7 +121,7 @@ func enumParents(ctx context.Context, h windows.Handle) (map[uint64]ParentEntry,
 }
 
 // readRecords lee el journal desde el inicio y filtra/resuelve los relevantes.
-func readRecords(ctx context.Context, h windows.Handle, journalID uint64, parentMap map[uint64]ParentEntry) ([]Entry, error) {
+func readRecords(ctx context.Context, h windows.Handle, journalID uint64, parentMap map[uint64]ntfspath.ParentEntry) ([]Entry, error) {
 	// READ_USN_JOURNAL_DATA_V0: StartUsn(8) + ReasonMask(4) + ReturnOnlyOnClose(4)
 	// + Timeout(8) + BytesToWaitFor(8) + UsnJournalID(8) = 40 bytes.
 	in := make([]byte, 40)
@@ -158,13 +161,13 @@ func readRecords(ctx context.Context, h windows.Handle, journalID uint64, parent
 			if !reasonIsRelevant(rec.Reason) {
 				continue
 			}
-			suspicious := isSuspiciousName(rec.FileName)
-			if !hasForensicExtension(rec.FileName) && !suspicious {
+			suspicious := fsforensic.IsSuspiciousName(rec.FileName)
+			if !fsforensic.HasForensicExtension(rec.FileName) && !suspicious {
 				continue
 			}
 			entries = append(entries, Entry{
 				Record:     rec,
-				FullPath:   resolvePath(parentMap, rec.ParentRef, rec.FileName),
+				FullPath:   ntfspath.ResolvePath(parentMap, rec.ParentRef, rec.FileName),
 				Suspicious: suspicious,
 			})
 		}

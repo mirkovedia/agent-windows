@@ -1,4 +1,4 @@
-package usn
+package ntfspath
 
 import "strings"
 
@@ -26,9 +26,9 @@ func isRoot(ref uint64) bool {
 	return ref&0x0000FFFFFFFFFFFF == rootRecordNumber
 }
 
-// resolvePath reconstruye la ruta absoluta subiendo por parentMap desde
+// ResolvePath reconstruye la ruta absoluta subiendo por parentMap desde
 // parentRef. Corta en la raíz; si un padre falta, antepone unresolvedPrefix.
-func resolvePath(parentMap map[uint64]ParentEntry, parentRef uint64, leaf string) string {
+func ResolvePath(parentMap map[uint64]ParentEntry, parentRef uint64, leaf string) string {
 	parts := []string{leaf}
 	ref := parentRef
 	for depth := 0; depth < maxDepth; depth++ {
