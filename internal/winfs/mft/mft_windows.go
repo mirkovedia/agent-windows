@@ -71,7 +71,7 @@ func ScanTimestomp(ctx context.Context, volume string) ([]Finding, error) {
 		if err != nil || !rec.HasSI || !rec.HasFN {
 			continue
 		}
-		v := detectTimestomp(rec.SI, rec.FN)
+		v := DetectTimestomp(rec.SI, rec.FN)
 		if !v.Stomped {
 			continue
 		}
@@ -198,5 +198,5 @@ func getFileRecord(h windows.Handle, fileRef uint64) (Record, error) {
 	if recLen <= 0 || 12+recLen > int(ret) {
 		return Record{}, errors.New("FileRecordLength fuera de rango")
 	}
-	return parseRecord(out[12 : 12+recLen])
+	return ParseRecord(out[12 : 12+recLen])
 }

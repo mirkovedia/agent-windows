@@ -12,10 +12,10 @@ type Verdict struct {
 	SubSecZeroed bool // heurística de confianza; no gatilla por sí sola
 }
 
-// detectTimestomp compara SI vs FN. Marca backdating imposible naturalmente:
+// DetectTimestomp compara SI vs FN. Marca backdating imposible naturalmente:
 // SI.Created (o SI.Modified) anterior a FN.Created, que es cuando se creó la
 // entrada de nombre. Los ceros (timestamps ausentes) no gatillan.
-func detectTimestomp(si, fn Timestamps) Verdict {
+func DetectTimestomp(si, fn Timestamps) Verdict {
 	var v Verdict
 	if isBefore(si.Created, fn.Created) {
 		v.Stomped = true
