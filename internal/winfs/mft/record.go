@@ -25,7 +25,8 @@ type Record struct {
 	FN       Timestamps
 	HasSI    bool
 	HasFN    bool
-	FileName string
+	FileName  string
+	ParentRef uint64 // referencia MFT del directorio padre (de los 8 primeros bytes del $FN)
 
 	fnNamespace byte // namespace del $FN ya tomado (para preferir el nombre largo)
 }
@@ -42,16 +43,16 @@ const (
 // ErrBadSignature indica que el buffer no empieza con la firma "FILE".
 var ErrBadSignature = errors.New("registro MFT sin firma FILE")
 
-// parseRecord parsea un registro FILE del MFT: valida firma, aplica el update
+// ParseRecord parsea un registro FILE del MFT: valida firma, aplica el update
 // sequence array fixup y extrae SI (0x10) y FN (0x30) de los atributos residentes.
-func parseRecord(buf []byte) (Record, error) {
+func ParseRecord(buf []byte) (Record, error) {
 	if len(buf) < 0x30 {
 		return Record{}, errors.New("registro MFT truncado")
 	}
 	if binary.LittleEndian.Uint32(buf[0:4]) != fileSignature {
 		return Record{}, ErrBadSignature
 	}
-	fixed, err := applyFixup(buf)
+	fixed, err := ApplyFixup(buf)
 	if err != nil {
 		return Record{}, err
 	}
@@ -67,9 +68,9 @@ func parseRecord(buf []byte) (Record, error) {
 	return rec, nil
 }
 
-// applyFixup restaura los últimos 2 bytes de cada sector, que NTFS reemplaza por
+// ApplyFixup restaura los últimos 2 bytes de cada sector, que NTFS reemplaza por
 // el update sequence number al escribir. Devuelve una copia corregida del buffer.
-func applyFixup(buf []byte) ([]byte, error) {
+func ApplyFixup(buf []byte) ([]byte, error) {
 	usaOff := int(binary.LittleEndian.Uint16(buf[0x04:0x06]))
 	usaCount := int(binary.LittleEndian.Uint16(buf[0x06:0x08]))
 	if usaCount == 0 || usaOff+usaCount*2 > len(buf) {
@@ -154,6 +155,7 @@ func (r *Record) applyFileName(c []byte) {
 	}
 	r.FN = parseTimestamps(c, 0x08)
 	r.FileName = decodeUTF16(c[0x42:nameEnd])
+	r.ParentRef = binary.LittleEndian.Uint64(c[0x00:0x08])
 	r.HasFN = true
 	r.fnNamespace = namespace
 }

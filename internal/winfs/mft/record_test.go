@@ -89,7 +89,7 @@ func TestParseRecordExtractsSIandFN(t *testing.T) {
 	si := siContent(ftKnown, ftKnown+10, ftKnown, ftKnown)
 	fn := fnContent(ftKnown, ftKnown, ftKnown, ftKnown, 1, "cheat.exe")
 	buf := buildRecord(0x0001, buildAttr(0x10, si), buildAttr(0x30, fn))
-	rec, err := parseRecord(buf)
+	rec, err := ParseRecord(buf)
 	if err != nil {
 		t.Fatalf("parseRecord: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestParseRecordExtractsSIandFN(t *testing.T) {
 func TestParseRecordBadSignature(t *testing.T) {
 	buf := buildRecord(0x0001, buildAttr(0x10, siContent(ftKnown, ftKnown, ftKnown, ftKnown)))
 	buf[0] = 'X' // rompe la firma "FILE"
-	if _, err := parseRecord(buf); err == nil {
+	if _, err := ParseRecord(buf); err == nil {
 		t.Fatal("esperaba error con firma inválida")
 	}
 }
@@ -119,7 +119,7 @@ func TestParseRecordPrefersLongName(t *testing.T) {
 	long := fnContent(ftKnown, ftKnown, ftKnown, ftKnown, 1, "cheatengine.exe")
 	dos := fnContent(ftKnown, ftKnown, ftKnown, ftKnown, 2, "CHEAT~1.EXE")
 	buf := buildRecord(0x0001, buildAttr(0x30, long), buildAttr(0x30, dos))
-	rec, err := parseRecord(buf)
+	rec, err := ParseRecord(buf)
 	if err != nil {
 		t.Fatalf("parseRecord: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestParseRecordPrefersLongName(t *testing.T) {
 func TestParseRecordFixupMismatch(t *testing.T) {
 	buf := buildRecord(0x0001, buildAttr(0x10, siContent(ftKnown, ftKnown, ftKnown, ftKnown)))
 	buf[0x1FE] ^= 0xFF // corrompe el fin del primer sector
-	if _, err := parseRecord(buf); err == nil {
+	if _, err := ParseRecord(buf); err == nil {
 		t.Fatal("esperaba error por número de secuencia que no coincide")
 	}
 }
