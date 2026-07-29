@@ -9,6 +9,7 @@ import (
 	"github.com/telagem/agent-windows/internal/collector"
 	"github.com/telagem/agent-windows/internal/collector/amcache"
 	"github.com/telagem/agent-windows/internal/collector/bam"
+	deletedcol "github.com/telagem/agent-windows/internal/collector/deleted"
 	mftcol "github.com/telagem/agent-windows/internal/collector/mft"
 	"github.com/telagem/agent-windows/internal/collector/prefetch"
 	"github.com/telagem/agent-windows/internal/collector/shimcache"
@@ -36,6 +37,7 @@ func RunLive(ctx context.Context, opts Options, up transport.Uploader) (report.R
 		prefetch.New(),
 		usncol.New(),
 		mftcol.New(),
+		deletedcol.New(),
 		bam.New(systemHive),
 		shimcache.New(systemHive),
 		amcache.New(amcacheHive),
