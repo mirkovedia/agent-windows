@@ -6,10 +6,10 @@ package prefetch
 import (
 	"encoding/binary"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/telagem/agent-windows/internal/winfs/compression"
+	"github.com/telagem/agent-windows/internal/winfs/wintext"
 	"github.com/telagem/agent-windows/internal/winfs/wintime"
 )
 
@@ -36,7 +36,7 @@ func parsePrefetch(raw []byte) (Entry, error) {
 	version := binary.LittleEndian.Uint32(data[0:4])
 
 	// Nombre del ejecutable: UTF-16LE en offset 0x10, hasta 60 bytes.
-	name := decodeUTF16(data[0x10:0x4C])
+	name := wintext.DecodeUTF16(data[0x10:0x4C])
 
 	e := Entry{
 		ExecutableName: name,
@@ -75,18 +75,5 @@ func parsePrefetch(raw []byte) (Entry, error) {
 		e.LastRunTimes = append(e.LastRunTimes, wintime.FiletimeToTime(ft))
 	}
 	return e, nil
-}
-
-// decodeUTF16 decodifica una cadena UTF-16LE terminada en nulo.
-func decodeUTF16(b []byte) string {
-	var sb strings.Builder
-	for i := 0; i+1 < len(b); i += 2 {
-		c := binary.LittleEndian.Uint16(b[i : i+2])
-		if c == 0 {
-			break
-		}
-		sb.WriteRune(rune(c))
-	}
-	return sb.String()
 }
 

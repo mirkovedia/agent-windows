@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/telagem/agent-windows/internal/winfs/wintext"
 	"github.com/telagem/agent-windows/internal/winfs/wintime"
 )
 
@@ -72,20 +73,8 @@ func parseWin10Record(rec []byte) (Entry, error) {
 	if 2+pathLen+8 > len(rec) {
 		return Entry{}, fmt.Errorf("registro truncado (path)")
 	}
-	path := decodeUTF16(rec[2 : 2+pathLen])
+	path := wintext.DecodeUTF16(rec[2 : 2+pathLen])
 	ft := binary.LittleEndian.Uint64(rec[2+pathLen : 2+pathLen+8])
 	return Entry{Path: path, ModifiedTime: wintime.FiletimeToTime(ft)}, nil
-}
-
-func decodeUTF16(b []byte) string {
-	var sb []rune
-	for i := 0; i+1 < len(b); i += 2 {
-		c := binary.LittleEndian.Uint16(b[i : i+2])
-		if c == 0 {
-			break
-		}
-		sb = append(sb, rune(c))
-	}
-	return string(sb)
 }
 

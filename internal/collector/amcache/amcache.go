@@ -3,7 +3,6 @@ package amcache
 
 import (
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"os"
 	"strings"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/telagem/agent-windows/internal/collector"
 	"github.com/telagem/agent-windows/internal/winfs/reghive"
+	"github.com/telagem/agent-windows/internal/winfs/wintext"
 )
 
 // Entry es un ejecutable registrado por AmCache. El SHA-1 sobrevive al borrado
@@ -78,13 +78,13 @@ func parseAmcache(h *reghive.Hive) ([]Entry, error) {
 		}
 		e := Entry{}
 		if p, ok := vals["LowerCaseLongPath"]; ok {
-			e.Path = decodeUTF16(p)
+			e.Path = wintext.DecodeUTF16(p)
 		}
 		if fid, ok := vals["FileId"]; ok {
-			e.SHA1 = normalizeFileID(decodeUTF16(fid))
+			e.SHA1 = normalizeFileID(wintext.DecodeUTF16(fid))
 		}
 		if ld, ok := vals["LinkDate"]; ok {
-			e.LinkDate = parseLinkDate(decodeUTF16(ld))
+			e.LinkDate = parseLinkDate(wintext.DecodeUTF16(ld))
 		}
 		if e.Path != "" || e.SHA1 != "" {
 			entries = append(entries, e)
@@ -110,17 +110,4 @@ func parseLinkDate(s string) time.Time {
 		return time.Time{}
 	}
 	return t
-}
-
-// decodeUTF16 decodifica REG_SZ (UTF-16LE) a string.
-func decodeUTF16(b []byte) string {
-	var sb []rune
-	for i := 0; i+1 < len(b); i += 2 {
-		c := binary.LittleEndian.Uint16(b[i : i+2])
-		if c == 0 {
-			break
-		}
-		sb = append(sb, rune(c))
-	}
-	return string(sb)
 }
