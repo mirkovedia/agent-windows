@@ -221,8 +221,12 @@ archivo → `[]TaskDefinition` completo. Intenta abrir el hive `SOFTWARE` → `O
 omite el cross-check pero se sigue con el resto (ver "Manejo de errores"). `DiffTasks` sobre el
 listado completo → `Artifact{Type:"scheduled_task_desync", ...}` por cada `Desync` (campos
 mínimos: `RelPath`, `Kind`, `TaskCacheID` — nunca `Command`/`Arguments`, ver "Filtrado y
-privacidad"). Filtra el listado en disco por forense-ext(`Command`) || sospechoso(`Command`/
-`Arguments`) || `Hidden` → `Artifact{Type:"scheduled_task", ...}` por cada tarea filtrada.
+privacidad"). Filtra el listado en disco por sospechoso(`Command`/`Arguments`) || `Hidden` →
+`Artifact{Type:"scheduled_task", ...}` por cada tarea filtrada. **Corrección post-diseño:** no
+se usa la whitelist de extensión forense aquí (a diferencia de USN, donde se combina con la razón
+del evento) — el `Command` de una tarea casi siempre apunta a un `.exe`, así que esa extensión no
+discrimina nada y reportaría casi cualquier tarea del sistema. Detectado por el test de la Tarea 7
+del plan de implementación.
 
 Se registran ambos en `internal/agent/live_windows.go` junto a los colectores existentes.
 
@@ -242,7 +246,7 @@ scheduler.Collect(ctx):
     -> WalkTaskCacheTree()       -> []CachedTask
   DiffTasks(onDisk completo, cached)   -> []Desync
     -> Artifact{Type:"scheduled_task_desync", RelPath, Kind, TaskCacheID}
-  filtra onDisk: forense-ext(Command) || sospechoso(Command/Arguments) || Hidden
+  filtra onDisk: sospechoso(Command/Arguments) || Hidden
     -> Artifact{Type:"scheduled_task", RelPath, Command, Arguments, Hidden, Author}
 ```
 
