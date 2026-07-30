@@ -73,13 +73,16 @@ func parseLog(data []byte, channel string) (*Log, error) {
 	log.Dirty = flags&0x1 != 0
 	log.Full = flags&0x2 != 0
 
+	checkFileFlags(log)
 	for off := 4096; off+chunkSize <= len(data); off += chunkSize {
 		chunk := data[off : off+chunkSize]
 		if string(chunk[0:8]) != "ElfChnk\x00" {
 			break
 		}
+		checkChunkCRC(chunk, log)
 		parseChunkRecords(chunk, channel, log)
 	}
+	checkRecordGaps(log.Records, log)
 	return log, nil
 }
 
