@@ -1,7 +1,7 @@
 # Agente Forense Windows — Fase 3D: Event Logs (.evtx) (Design)
 
 **Fecha:** 2026-07-30
-**Estado:** Aprobado, listo para plan de implementación
+**Estado:** Implementado (7/7 tasks, mergeado a master el 2026-07-30)
 **Depende de:** Fases 1-3C (interfaz `collector.Collector`, `wintext.DecodeUTF16`, `wintime`,
 patrón VSS, patrón de build tags `winfs/*`, parsers puros `winfs/services` y `winfs/scheduler`,
 patrón de builder sintético `reghivetest`)
