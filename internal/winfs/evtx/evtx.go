@@ -103,6 +103,11 @@ func parseChunkRecords(chunk []byte, channel string, log *Log) {
 			Timestamp: wintime.FiletimeToTime(binary.LittleEndian.Uint64(chunk[off+16 : off+24])),
 			Channel:   channel,
 		}
+		payload := chunk[off+24 : off+size-4]
+		eventID, subs, partial := decodeBinXML(payload)
+		r.EventID = eventID
+		r.Subs = subs
+		r.PartialDecode = partial
 		log.Records = append(log.Records, r)
 		off += size
 	}
