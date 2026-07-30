@@ -108,6 +108,7 @@ func parseChunkRecords(chunk []byte, channel string, log *Log) {
 		r.EventID = eventID
 		r.Subs = subs
 		r.PartialDecode = partial
+		r.Fields = fieldsFor(eventID, subs)
 		log.Records = append(log.Records, r)
 		off += size
 	}
