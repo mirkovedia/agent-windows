@@ -46,6 +46,10 @@ var baseRules = map[string]Rule{
 	"service_driver":        {CatPersistence, SevMedium, 0.5},
 	"scheduled_task":        {CatPersistence, SevMedium, 0.5},
 	"deleted_entry":         {CatAntiForensic, SevLow, 0.3},
+	// Diagnóstico de cobertura, no evidencia: informa que parte del árbol de
+	// tareas no se pudo enumerar. Va en baseRules (y no como tipo neutro) para
+	// que se emita como hallazgo propio y sea visible en el reporte.
+	"scheduled_task_scan_incomplete": {CatExecution, SevInfo, 0.0},
 }
 
 // neutralRule es la clasificación de la evidencia de ejecución normal y de

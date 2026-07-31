@@ -123,6 +123,8 @@ func titleFor(artifactType string) string {
 		return "Tarea programada oculta o sospechosa"
 	case "deleted_entry":
 		return "Archivo borrado recuperado del MFT"
+	case "scheduled_task_scan_incomplete":
+		return "Enumeración de tareas incompleta (directorios sin permiso)"
 	}
 	return "Artefacto " + artifactType
 }

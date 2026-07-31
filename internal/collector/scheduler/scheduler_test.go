@@ -42,11 +42,39 @@ func TestReadTasksDirCountsUnparseableAsPresent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("readTasksDir: %v", err)
 	}
-	if len(got) != 1 {
-		t.Fatalf("un XML ilegible sigue siendo una tarea presente en disco, got %d", len(got))
+	if len(got.tasks) != 1 {
+		t.Fatalf("un XML ilegible sigue siendo una tarea presente en disco, got %d", len(got.tasks))
 	}
-	if got[0].RelPath != "TareaIlegible" {
-		t.Fatalf("RelPath = %q, want TareaIlegible", got[0].RelPath)
+	if got.tasks[0].RelPath != "TareaIlegible" {
+		t.Fatalf("RelPath = %q, want TareaIlegible", got.tasks[0].RelPath)
+	}
+}
+
+// TestIsUnderAny cubre la decisión de no afirmar un borrado sobre un
+// directorio que nunca se pudo listar: la causa de los 42 falsos positivos
+// que sobrevivieron a la primera corrección.
+func TestIsUnderAny(t *testing.T) {
+	dirs := []string{`Microsoft\Windows\Application Experience`}
+	dentro := []string{
+		`Microsoft\Windows\Application Experience`,
+		`Microsoft\Windows\Application Experience\AitAgent`,
+		`microsoft\windows\application experience\ProgramDataUpdater`,
+	}
+	for _, p := range dentro {
+		if !isUnderAny(p, dirs) {
+			t.Errorf("isUnderAny(%q) = false, debería estar dentro", p)
+		}
+	}
+	fuera := []string{
+		`Microsoft\Windows\Defender\Scan`,
+		`MiTarea`,
+		// Prefijo parcial: no debe contar como subdirectorio.
+		`Microsoft\Windows\Application ExperienceOtro\X`,
+	}
+	for _, p := range fuera {
+		if isUnderAny(p, dirs) {
+			t.Errorf("isUnderAny(%q) = true, está fuera", p)
+		}
 	}
 }
 
