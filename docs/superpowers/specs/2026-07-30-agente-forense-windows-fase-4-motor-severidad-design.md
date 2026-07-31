@@ -116,8 +116,12 @@ neutro. El motor nunca falla por un tipo que no conoce.
 
 Si el `Source` del artefacto (ruta o nombre) matchea `fsforensic.IsSuspiciousName` — los
 marcadores ya usados por USN y MFT: `cheat`, `inject`, `loader`, `bypass`, `aimbot`, `macro`,
-`esp`, `hook`, `wipe`, `ccleaner`, `bleachbit` — la severidad **sube un nivel** y la confianza
-pasa a `0.8`.
+`esp`, `hook`, `wipe`, `ccleaner`, `bleachbit` — la severidad **sube dos niveles, con tope en
+HIGH**, y la confianza pasa a `0.8`.
+
+El tope importa: `CRITICAL` queda reservado para los combos. Un nombre sospechoso es una señal
+fuerte, pero por sí sola no es la afirmación más grave que el motor puede hacer — un archivo
+puede llamarse `cheat_notes.txt` sin que nadie haya tramposeado.
 
 Esto es lo que separa un `deleted_entry` cualquiera (LOW, ruido normal) de
 `aimbot_loader.exe` borrado (HIGH). Y es lo que rescata de la evidencia neutra los pocos
