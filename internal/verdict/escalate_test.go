@@ -71,6 +71,73 @@ func TestEscalateDesyncFileOnly(t *testing.T) {
 	}
 }
 
+func TestEscalateTaskNoRegisterLogIsInfo(t *testing.T) {
+	// Los Event Logs rotan: una tarea vieja nunca tiene su evento 106, así
+	// que la ausencia no prueba nada. Se reporta pero no mueve el veredicto.
+	a := art("eventlog.desync", "Updater", map[string]string{"Kind": "task_no_register_log"})
+	got := escalate(a, ruleFor("eventlog.desync"))
+	if got.Severity != SevInfo {
+		t.Fatalf("task_no_register_log debe ser INFO, got %s", got.Severity)
+	}
+}
+
+func TestEscalateOtherDesyncKindsStayMedium(t *testing.T) {
+	for _, kind := range []string{"service_no_install_log", "service_installed_then_removed", "task_delete_desync"} {
+		a := art("eventlog.desync", "X", map[string]string{"Kind": kind})
+		got := escalate(a, ruleFor("eventlog.desync"))
+		if got.Severity != SevMedium {
+			t.Errorf("%s debe seguir en MEDIUM, got %s", kind, got.Severity)
+		}
+	}
+}
+
+func TestEscalateMicrosoftHiddenTaskIsInfo(t *testing.T) {
+	a := art("scheduled_task", `Microsoft\Windows\UpdateOrchestrator\Reboot`,
+		map[string]any{"RelPath": `Microsoft\Windows\UpdateOrchestrator\Reboot`, "Hidden": true})
+	got := escalate(a, ruleFor("scheduled_task"))
+	if got.Severity != SevInfo {
+		t.Fatalf("una tarea oculta de Microsoft debe ser INFO, got %s", got.Severity)
+	}
+}
+
+func TestEscalateNonMicrosoftHiddenTaskStaysMedium(t *testing.T) {
+	a := art("scheduled_task", `MiTareaRara`,
+		map[string]any{"RelPath": `MiTareaRara`, "Hidden": true})
+	got := escalate(a, ruleFor("scheduled_task"))
+	if got.Severity != SevMedium {
+		t.Fatalf("una tarea oculta fuera de Microsoft sigue en MEDIUM, got %s", got.Severity)
+	}
+}
+
+func TestEscalateDriverInNormalLocationIsInfo(t *testing.T) {
+	normales := []string{
+		`C:\Program Files\Vendor\driver.sys`,
+		`C:\Program Files (x86)\Otro\x.sys`,
+		`C:\Windows\System32\DriverStore\FileRepository\algo\y.sys`,
+	}
+	for _, p := range normales {
+		a := art("service_driver", p, map[string]any{"ImagePath": p})
+		got := escalate(a, ruleFor("service_driver"))
+		if got.Severity != SevInfo {
+			t.Errorf("driver en %q debe ser INFO, got %s", p, got.Severity)
+		}
+	}
+}
+
+func TestEscalateDriverInSuspiciousLocationStaysMedium(t *testing.T) {
+	raros := []string{
+		`C:\Users\X\AppData\Local\Temp\evil.sys`,
+		`C:\Users\X\Downloads\d.sys`,
+	}
+	for _, p := range raros {
+		a := art("service_driver", p, map[string]any{"ImagePath": p})
+		got := escalate(a, ruleFor("service_driver"))
+		if got.Severity != SevMedium {
+			t.Errorf("driver en %q debe seguir en MEDIUM, got %s", p, got.Severity)
+		}
+	}
+}
+
 func TestEscalateCorruptDataKeepsBase(t *testing.T) {
 	a := collector.Artifact{Type: "scheduled_task_desync", Source: "X", Data: []byte("{no es json")}
 	base := ruleFor("scheduled_task_desync")
