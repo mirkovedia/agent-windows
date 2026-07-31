@@ -2,6 +2,7 @@ package verdict
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/telagem/agent-windows/internal/collector"
@@ -124,6 +125,46 @@ func TestVerdictTwoMediumsIsSospechoso(t *testing.T) {
 	})
 	if v.Level != report.LevelSospechoso {
 		t.Fatalf("dos MEDIUM son SOSPECHOSO, got %q", v.Level)
+	}
+}
+
+func TestEvaluateDeduplicatesSameArtifact(t *testing.T) {
+	// El USN registra cada modificación del archivo: el mismo objeto aparece
+	// muchas veces y hoy cada evento produce un hallazgo separado.
+	same := `C:\Temp\aimbot.exe`
+	arts := []collector.Artifact{
+		art("deleted_entry", same, nil),
+		art("deleted_entry", same, nil),
+		art("deleted_entry", same, nil),
+	}
+	findings, _ := Evaluate([]collector.Result{resultWith("deleted", arts...)})
+	if len(findings) != 1 {
+		t.Fatalf("tres eventos del mismo artefacto deben colapsar en 1, got %d", len(findings))
+	}
+	if !strings.Contains(findings[0].Evidence, "3") {
+		t.Fatalf("la evidencia debe informar cuántos eventos hubo, got %q", findings[0].Evidence)
+	}
+}
+
+func TestEvaluateDoesNotMergeDifferentArtifacts(t *testing.T) {
+	arts := []collector.Artifact{
+		art("deleted_entry", `C:\Temp\aimbot.exe`, nil),
+		art("deleted_entry", `C:\Temp\cheat.exe`, nil),
+	}
+	findings, _ := Evaluate([]collector.Result{resultWith("deleted", arts...)})
+	if len(findings) != 2 {
+		t.Fatalf("artefactos distintos no se colapsan, got %d", len(findings))
+	}
+}
+
+func TestEvaluateDoesNotMergeAcrossTypes(t *testing.T) {
+	same := `C:\Temp\aimbot.exe`
+	findings, _ := Evaluate([]collector.Result{
+		resultWith("deleted", art("deleted_entry", same, nil)),
+		resultWith("mft", art("mft_timestomp", same, nil)),
+	})
+	if len(findings) != 2 {
+		t.Fatalf("el mismo archivo visto por dos detectores son dos señales, got %d", len(findings))
 	}
 }
 
