@@ -225,6 +225,55 @@ que cualquier fixture inventado, porque salió de una máquina real.
 **Criterio de éxito de la fase:** re-ejecutar el escaneo sobre la misma máquina y obtener veredicto
 `LIMPIO`.
 
+## Segunda iteración: lo que reveló la re-ejecución
+
+Aplicadas las correcciones anteriores, la segunda corrida bajó de 1070 a **306 hallazgos** (92
+señales pasaron a `INFO`), pero el veredicto **siguió siendo `EVIDENCIA_FUERTE`**: 1 `CRITICAL` y
+44 `HIGH`. Aparecieron tres causas nuevas, todas con la misma raíz conceptual:
+
+> El agente estaba convirtiendo **"no pude verificar"** en **"hay evidencia"**.
+
+### 6. Los marcadores débiles pesaban demasiado
+
+El `CRITICAL` fue `run-hook.cmd`, un script de desarrollo (de nuevo con `"Stomped": false`). El
+token exacto `hook` es correcto como match, pero es **evidencia floja**: no distingue un cheat de
+cualquier script con hooks de build o de git.
+
+**Corrección:** el escalado por nombre ahora tiene tope según el peso del marcador. Los fuertes
+(`cheat`, `aimbot`, `ccleaner`, `bleachbit`) llegan a `HIGH`; los débiles (token exacto: `hook`,
+`esp`, `loader`, `inject`, `macro`, `wipe`, `bypass`) topan en `MEDIUM`. Se agrega
+`fsforensic.HasStrongMarker` para que el motor pueda distinguirlos.
+
+### 7. Tareas ilegibles se reportaban como borradas (bug, no calibración)
+
+Los 42 `HIGH` restantes eran `scheduled_task_desync` de tipo `hive_only`, **todos sobre tareas
+propias de Windows** (`Microsoft\Windows\Application Experience\AitAgent`, `KernelCeipTask`,
+`DirectXDatabaseUpdater`…).
+
+Causa: en `collector/scheduler`, un XML que no se puede leer o parsear se descartaba del listado
+en disco. Windows pone ACLs restrictivas sobre varias de sus propias tareas, así que el
+cross-check contra `TaskCache` concluía que habían sido **borradas del disco**. Pero `WalkDir` ya
+había probado que el archivo existe: solo no se pudo abrir.
+
+**Corrección:** una tarea cuyo XML es ilegible o no parsea se registra igual como presente
+(`TaskDefinition{RelPath: rel}`). Queda sin `Command`/`Hidden`, así que el filtro de tareas
+reportables no la destaca, pero el diff deja de inventar un borrado. Una tarea realmente borrada
+del disco sigue sin aparecer en `WalkDir`, así que la detección real no se debilita.
+
+### 8. Señales de log que no prueban manipulación
+
+Las 2 `HIGH` restantes eran `eventlog.tamper_signal`:
+
+- **`log_unreadable`** sobre `Microsoft-Windows-TaskScheduler%4Operational.evtx`: el log **no
+  existe** en la máquina. Windows lo trae deshabilitado por defecto. Se reportaba con el título
+  *"Archivo de log alterado a nivel binario"*, que es directamente falso.
+- **`dirty_flag`**: esperable en un snapshot VSS de un log que estaba abierto y escribiéndose.
+
+**Corrección:** `eventlog.tamper_signal` se diferencia por `Kind`. `chunk_crc_invalid`,
+`record_id_gap` y `truncated` se mantienen en `HIGH` (implican edición binaria real);
+`log_unreadable`, `dirty_flag` y `full_flag` bajan a `INFO`. El título del tipo pasa a
+*"Anomalía estructural en archivo de log"*, neutro y verdadero para todos los casos.
+
 ## Fuera de alcance
 
 - **Resolución de rutas `<sin-resolver>`.** Muchos artefactos del MFT y del USN no logran
