@@ -109,7 +109,10 @@ func titleFor(artifactType string) string {
 	case "mft_timestomp":
 		return "Timestamps manipulados (timestomping)"
 	case "eventlog.tamper_signal":
-		return "Archivo de log alterado a nivel binario"
+		// Neutro a propósito: el mismo tipo cubre desde un CRC roto (edición
+		// binaria real) hasta un log que no se pudo abrir. Afirmar "alterado"
+		// en ambos casos sería mentir en el segundo.
+		return "Anomalía estructural en archivo de log"
 	case "eventlog.desync":
 		return "Los eventos no coinciden con el estado del sistema"
 	case "scheduled_task_desync":

@@ -101,17 +101,25 @@ func (c *Collector) readTasksDir(ctx context.Context) ([]winscheduler.TaskDefini
 			return ctx.Err()
 		default:
 		}
-		raw, err := os.ReadFile(path)
-		if err != nil {
-			return nil
-		}
 		rel, err := filepath.Rel(c.TasksDir, path)
 		if err != nil {
 			return nil
 		}
+		// WalkDir ya probó que el archivo EXISTE. Si después no se puede leer
+		// o parsear (Windows pone ACLs restrictivas en varias de sus propias
+		// tareas), igual se registra como presente en disco: descartarla haría
+		// que el cross-check contra TaskCache la reporte como borrada, que es
+		// afirmar algo que no sabemos. Queda sin Command/Hidden, así que el
+		// filtro de tareas reportables no la va a destacar.
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			out = append(out, winscheduler.TaskDefinition{RelPath: rel})
+			return nil
+		}
 		t, err := winscheduler.ParseTaskXML(raw, rel)
 		if err != nil {
-			return nil // XML corrupto o no-XML: se omite
+			out = append(out, winscheduler.TaskDefinition{RelPath: rel})
+			return nil
 		}
 		out = append(out, t)
 		return nil

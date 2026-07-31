@@ -20,16 +20,30 @@ func escalate(a collector.Artifact, base Rule) Rule {
 	return escalateByName(a, r)
 }
 
-// escalateByName sube dos niveles (con tope en HIGH) si el Source matchea un
-// marcador de fsforensic. El tope existe porque CRITICAL se reserva a los
-// combos: un nombre feo es señal fuerte, pero no la afirmación más grave.
+// escalateByName sube dos niveles si el Source matchea un marcador de
+// fsforensic, con un tope que depende del peso de la evidencia:
+//
+//   - marcador fuerte (cheat, aimbot, ...): tope HIGH. CRITICAL se reserva a
+//     los combos, porque un nombre feo por sí solo no es la afirmación más
+//     grave que el motor puede hacer.
+//   - marcador débil (token exacto: hook, esp, loader, ...): tope MEDIUM. Un
+//     "run-hook.cmd" borrado es un script de desarrollo, no evidencia forense.
 func escalateByName(a collector.Artifact, r Rule) Rule {
-	if !fsforensic.IsSuspiciousName(a.Source) {
+	strong := fsforensic.HasStrongMarker(a.Source)
+	if !strong && !fsforensic.IsSuspiciousName(a.Source) {
 		return r
 	}
+	cap := SevMedium
+	if strong {
+		cap = SevHigh
+	}
 	raised := bumpSeverity(r.Severity, 2)
-	if severityRank(raised) > severityRank(SevHigh) {
-		raised = SevHigh
+	if severityRank(raised) > severityRank(cap) {
+		raised = cap
+	}
+	// Nunca bajar: si la regla base ya era más grave, se respeta.
+	if severityRank(raised) < severityRank(r.Severity) {
+		raised = r.Severity
 	}
 	r.Severity = raised
 	r.Confidence = suspiciousConfidence
@@ -48,6 +62,39 @@ func escalateByDetail(a collector.Artifact, r Rule) Rule {
 		return scheduledTaskRule(a, r)
 	case "service_driver":
 		return serviceDriverRule(a, r)
+	case "eventlog.tamper_signal":
+		return tamperSignalRule(a, r)
+	}
+	return r
+}
+
+// nonEvidenceTamperKinds son señales que NO prueban manipulación:
+//   - log_unreadable: el log no se pudo abrir. TaskScheduler/Operational viene
+//     deshabilitado por defecto en Windows, así que "no existe" es lo normal.
+//   - dirty_flag / full_flag: banderas esperables en un snapshot VSS de un log
+//     que estaba abierto y escribiéndose.
+//
+// Reportar "no pude verificar" como evidencia es justamente el error que hay
+// que evitar en una herramienta que puede sancionar a alguien.
+var nonEvidenceTamperKinds = map[string]bool{
+	"log_unreadable": true,
+	"dirty_flag":     true,
+	"full_flag":      true,
+}
+
+// tamperSignalRule baja a INFO las señales que no distinguen manipulación de
+// condiciones normales. chunk_crc_invalid, record_id_gap y truncated se
+// mantienen en HIGH: esos sí implican edición binaria del archivo.
+func tamperSignalRule(a collector.Artifact, r Rule) Rule {
+	var payload struct {
+		Kind string
+	}
+	if err := json.Unmarshal(a.Data, &payload); err != nil {
+		return r
+	}
+	if nonEvidenceTamperKinds[payload.Kind] {
+		r.Severity = SevInfo
+		r.Confidence = 0.0
 	}
 	return r
 }

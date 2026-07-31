@@ -28,6 +28,28 @@ func TestCollectorImplementsInterface(t *testing.T) {
 // directorio temporal con dos tareas: una oculta (debe reportarse) y una
 // normal sin nada sospechoso (no debe reportarse). El hive SOFTWARE no
 // existe en este test -> el cross-check se omite sin abortar el colector.
+// TestReadTasksDirCountsUnparseableAsPresent cubre la causa de los 42 falsos
+// positivos de la segunda ejecución real: las tareas de Windows cuyo XML no se
+// puede leer o parsear desaparecían del listado en disco, y el cross-check
+// concluía que habían sido borradas del disco. WalkDir sí las vio: existen.
+func TestReadTasksDirCountsUnparseableAsPresent(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "TareaIlegible"), []byte("esto no es xml"), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	c := New(dir, "")
+	got, err := c.readTasksDir(context.Background())
+	if err != nil {
+		t.Fatalf("readTasksDir: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("un XML ilegible sigue siendo una tarea presente en disco, got %d", len(got))
+	}
+	if got[0].RelPath != "TareaIlegible" {
+		t.Fatalf("RelPath = %q, want TareaIlegible", got[0].RelPath)
+	}
+}
+
 func TestCollectWithSyntheticTasksDir(t *testing.T) {
 	dir := t.TempDir()
 	hiddenXML := `<?xml version="1.0" encoding="UTF-16"?>

@@ -33,6 +33,49 @@ func TestEscalateNeutralSuspiciousBecomesMedium(t *testing.T) {
 	}
 }
 
+// TestEscalateWeakMarkerCapsAtMedium usa run-hook.cmd, el CRITICAL de la
+// segunda ejecución real. Es un script de desarrollo: el token "hook" es
+// evidencia débil y no puede llevar un archivo borrado hasta HIGH.
+func TestEscalateWeakMarkerCapsAtMedium(t *testing.T) {
+	a := art("deleted_entry", `C:\proyecto\run-hook.cmd`, nil)
+	got := escalate(a, ruleFor("deleted_entry"))
+	if got.Severity != SevMedium {
+		t.Fatalf("un marcador débil topa en MEDIUM, got %s", got.Severity)
+	}
+}
+
+func TestEscalateStrongMarkerStillReachesHigh(t *testing.T) {
+	a := art("deleted_entry", `C:\Temp\aimbot_loader.exe`, nil)
+	got := escalate(a, ruleFor("deleted_entry"))
+	if got.Severity != SevHigh {
+		t.Fatalf("un marcador fuerte sí llega a HIGH, got %s", got.Severity)
+	}
+}
+
+func TestEscalateTamperKindsThatAreNotEvidence(t *testing.T) {
+	// Ninguno de estos prueba manipulación: log_unreadable es un log que no
+	// existe (TaskScheduler/Operational viene deshabilitado en Windows) y
+	// dirty_flag es lo normal en un snapshot de un log vivo.
+	for _, kind := range []string{"log_unreadable", "dirty_flag", "full_flag"} {
+		a := art("eventlog.tamper_signal", kind, map[string]string{"Kind": kind})
+		got := escalate(a, ruleFor("eventlog.tamper_signal"))
+		if got.Severity != SevInfo {
+			t.Errorf("%s debe ser INFO, got %s", kind, got.Severity)
+		}
+	}
+}
+
+func TestEscalateTamperKindsThatAreEvidence(t *testing.T) {
+	// Estos sí son manipulación binaria del archivo.
+	for _, kind := range []string{"chunk_crc_invalid", "record_id_gap", "truncated"} {
+		a := art("eventlog.tamper_signal", kind, map[string]string{"Kind": kind})
+		got := escalate(a, ruleFor("eventlog.tamper_signal"))
+		if got.Severity != SevHigh {
+			t.Errorf("%s debe seguir en HIGH, got %s", kind, got.Severity)
+		}
+	}
+}
+
 func TestEscalateCapsAtHigh(t *testing.T) {
 	// service_driver base es MEDIUM; +2 saturaría en CRITICAL, pero el
 	// escalado por contenido tiene tope HIGH (CRITICAL es solo de combos).

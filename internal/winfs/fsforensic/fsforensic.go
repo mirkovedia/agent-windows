@@ -61,9 +61,16 @@ func IsSystemComponent(name string) bool {
 	return false
 }
 
-// IsSuspiciousName reporta si el nombre contiene un marcador sospechoso.
-// Los componentes de sistema quedan excluidos sin evaluar marcadores.
+// IsSuspiciousName reporta si el nombre contiene un marcador sospechoso, de
+// cualquiera de los dos niveles. Los componentes de sistema quedan excluidos.
 func IsSuspiciousName(name string) bool {
+	return HasStrongMarker(name) || hasWeakMarker(name)
+}
+
+// HasStrongMarker reporta si el nombre contiene un marcador inequívoco
+// (substring). Los llamadores lo usan para distinguir el peso de la evidencia:
+// un marcador fuerte justifica más severidad que uno débil.
+func HasStrongMarker(name string) bool {
 	if IsSystemComponent(name) {
 		return false
 	}
@@ -72,6 +79,16 @@ func IsSuspiciousName(name string) bool {
 		if strings.Contains(lower, m) {
 			return true
 		}
+	}
+	return false
+}
+
+// hasWeakMarker reporta si algún token del nombre es exactamente un marcador
+// ambiguo. Es evidencia floja: "run-hook.cmd" y "esp.dll" matchean igual, y el
+// primero es un script de desarrollo cualquiera.
+func hasWeakMarker(name string) bool {
+	if IsSystemComponent(name) {
+		return false
 	}
 	for _, tk := range tokenize(name) {
 		for _, m := range weakMarkers {
