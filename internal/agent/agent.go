@@ -11,6 +11,7 @@ import (
 	"github.com/telagem/agent-windows/internal/collector"
 	"github.com/telagem/agent-windows/internal/report"
 	"github.com/telagem/agent-windows/internal/transport"
+	"github.com/telagem/agent-windows/internal/verdict"
 )
 
 // Options configura una ejecución del agente.
@@ -59,18 +60,17 @@ func runWithCollectors(ctx context.Context, opts Options, up transport.Uploader,
 	}
 
 	results := collector.Run(ctx, collectors)
+	findings, v := verdict.Evaluate(results)
+	rep.Verdict = v
 	seq := 0
-	for _, res := range results {
-		findings := resultToFindings(res)
-		for _, f := range findings {
-			chainHash, err := chain.Append(f)
-			if err != nil {
-				continue
-			}
-			rep.Findings = append(rep.Findings, f)
-			_ = up.StreamFinding(ctx, sess.SessionID, seq, f, chainHash)
-			seq++
+	for _, f := range findings {
+		chainHash, err := chain.Append(f)
+		if err != nil {
+			continue
 		}
+		rep.Findings = append(rep.Findings, f)
+		_ = up.StreamFinding(ctx, sess.SessionID, seq, f, chainHash)
+		seq++
 	}
 
 	rep.HashChain = chain.Hashes()
@@ -84,32 +84,3 @@ func runWithCollectors(ctx context.Context, opts Options, up transport.Uploader,
 	return rep, nil
 }
 
-// resultToFindings traduce el resultado de un colector a findings. Un colector
-// caído se convierte en un finding INFO; los artefactos se resumen como INFO
-// de EXECUTION (la correlación real es fase 4).
-func resultToFindings(res collector.Result) []report.Finding {
-	if res.Err != nil {
-		return []report.Finding{{
-			ID:         "collector-error-" + res.Collector,
-			Category:   "ANTI_FORENSIC",
-			Severity:   "INFO",
-			Confidence: 0.1,
-			Title:      "Colector " + res.Collector + " falló",
-			Evidence:   res.Err.Error(),
-			Artifact:   res.Collector,
-		}}
-	}
-	findings := make([]report.Finding, 0, len(res.Artifacts))
-	for i, a := range res.Artifacts {
-		findings = append(findings, report.Finding{
-			ID:         fmt.Sprintf("%s-%d", res.Collector, i),
-			Category:   "EXECUTION",
-			Severity:   "INFO",
-			Confidence: 0.0,
-			Title:      "Artefacto " + a.Type,
-			Evidence:   string(a.Data),
-			Artifact:   a.Source,
-		})
-	}
-	return findings
-}
