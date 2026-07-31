@@ -1,6 +1,12 @@
 # Binarios compilados
 *.exe
 
+# Reportes de escaneo: contienen metadatos forenses de la maquina donde se
+# corrio (rutas de usuario, nombres de archivos borrados). Nunca se commitean.
+reporte.json
+*-reporte.json
+salida.txt
+
 # Fixtures de test (se regeneran; ver testdata/README.md)
 **/testdata/*.bin
 **/testdata/*.expected
