@@ -123,15 +123,18 @@ var strongMarkers = []string{"cheat", "aimbot", "ccleaner", "bleachbit"}
 
 // weakMarkers: cortos o comunes como fragmento de palabras legítimas. Solo
 // cuentan cuando aparecen como token completo del nombre.
-var weakMarkers = []string{"inject", "loader", "bypass", "macro", "esp", "hook", "wipe"}
+var weakMarkers = []string{"inject", "injector", "loader", "bypass", "macro", "esp", "hook", "wipe"}
 
 // tokenize parte un nombre en tokens por separadores (-, _, ., espacio) y por
 // cambios de camelCase, en minúscula.
 func tokenize(name string) []string
 ```
 
-Se conserva el conjunto de 11 marcadores original; solo se reparte. No se agregan marcadores
-nuevos (queda fuera de alcance).
+Se conserva el conjunto de 11 marcadores original y solo se reparte, con **una** excepción:
+se agrega `injector` como variante de token de `inject`. Es necesaria, no un agregado de alcance:
+el test existente exige que `FreeFire_Injector.exe` se detecte, y bajo matcheo de token exacto
+`injector` ≠ `inject`. Enumerar la variante es preferible a relajar el matcheo a prefijo, porque
+el prefijo reintroduciría el falso positivo de `pyproject-hooks` (`hooks` empieza con `hook`).
 
 Verificación contra los nombres reales del reporte:
 
@@ -143,6 +146,7 @@ Verificación contra los nombres reales del reporte:
 | `aimbot_loader.exe` | detectado — `aimbot` es marcador fuerte |
 | `aimbotloader.exe` | detectado — `aimbot` por substring, aunque no haya separadores |
 | `esp.dll` | detectado — `esp` es token completo |
+| `FreeFire_Injector.exe` | detectado — tokens `[free, fire, injector, exe]`, `injector` es marcador |
 
 **Costo aceptado:** el matcheo exacto de token no cubre plurales ni derivados. Un cheat llamado
 `hooks.dll` no se detecta por el marcador `hook`. Es una decisión deliberada: dado que los falsos
