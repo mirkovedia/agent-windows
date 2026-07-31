@@ -1,7 +1,7 @@
 # Agente Forense Windows — Fase 4: Motor de Severidad y Veredicto (Design)
 
 **Fecha:** 2026-07-30
-**Estado:** Aprobado, listo para plan de implementación
+**Estado:** Implementado (7/7 tasks, mergeado a master el 2026-07-30)
 **Depende de:** Fases 1–3D (11 colectores, `collector.Result`, `report.Finding`, `fsforensic`)
 
 ## Contexto
