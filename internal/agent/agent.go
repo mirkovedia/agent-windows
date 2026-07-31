@@ -20,6 +20,9 @@ type Options struct {
 	ServerURL string
 	Version   string
 	Machine   report.MachineInfo // estado de la máquina (elevación, VM, OS, uptime)
+	// Observer, si tiene callbacks, recibe el avance del escaneo. El modo
+	// consola lo deja vacío y se comporta exactamente como antes.
+	Observer collector.Observer
 }
 
 // runWithCollectors ejecuta el flujo completo con colectores y consentimiento
@@ -59,7 +62,7 @@ func runWithCollectors(ctx context.Context, opts Options, up transport.Uploader,
 		Status:       "COMPLETE",
 	}
 
-	results := collector.Run(ctx, collectors)
+	results := collector.RunObserved(ctx, collectors, opts.Observer)
 	findings, v := verdict.Evaluate(results)
 	rep.Verdict = v
 	seq := 0

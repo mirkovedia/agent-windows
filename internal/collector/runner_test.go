@@ -3,6 +3,8 @@ package collector
 import (
 	"context"
 	"errors"
+	"fmt"
+	"reflect"
 	"testing"
 )
 
@@ -38,6 +40,55 @@ func TestRunOrdersByPriority(t *testing.T) {
 		if got[i] != want[i] {
 			t.Fatalf("orden = %v, want %v", got, want)
 		}
+	}
+}
+
+func TestRunObservedEmitsStartAndFinishInOrder(t *testing.T) {
+	cols := []Collector{
+		stubCollector{name: "uno", priority: PriorityVolatile},
+		stubCollector{name: "dos", priority: PriorityDisk},
+	}
+	var seq []string
+	obs := Observer{
+		OnStart: func(index, total int, name string) {
+			seq = append(seq, fmt.Sprintf("start:%d/%d:%s", index, total, name))
+		},
+		OnFinish: func(index, total int, res Result) {
+			seq = append(seq, fmt.Sprintf("finish:%d/%d:%s", index, total, res.Collector))
+		},
+	}
+	RunObserved(context.Background(), cols, obs)
+
+	want := []string{
+		"start:1/2:uno", "finish:1/2:uno",
+		"start:2/2:dos", "finish:2/2:dos",
+	}
+	if !reflect.DeepEqual(seq, want) {
+		t.Fatalf("secuencia = %v, want %v", seq, want)
+	}
+}
+
+// TestRunObservedWithNilCallbacksDoesNotPanic cubre el camino del modo
+// consola, que pasa un Observer vacío.
+func TestRunObservedWithNilCallbacksDoesNotPanic(t *testing.T) {
+	cols := []Collector{stubCollector{name: "uno", priority: PriorityDisk}}
+	res := RunObserved(context.Background(), cols, Observer{})
+	if len(res) != 1 {
+		t.Fatalf("esperaba 1 resultado, got %d", len(res))
+	}
+}
+
+// TestRunObservedReportsFailureToObserver garantiza que la UI pueda pintar en
+// ámbar un colector caído: el observer tiene que ver el error, no solo el
+// resultado final.
+func TestRunObservedReportsFailureToObserver(t *testing.T) {
+	cols := []Collector{stubCollector{name: "malo", priority: PriorityDisk, err: errors.New("sin permiso")}}
+	var gotErr error
+	RunObserved(context.Background(), cols, Observer{
+		OnFinish: func(index, total int, res Result) { gotErr = res.Err },
+	})
+	if gotErr == nil {
+		t.Fatal("el observer debe recibir el error del colector")
 	}
 }
 
