@@ -3,7 +3,13 @@
 var state = {
   totalArtifacts: 0,
   collectors: {}, // nombre -> li del DOM
+  live: { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 },
+  liveShown: 0,
 };
+
+// Tope de nodos en el feed en vivo. Sin esto un escaneo con muchas señales
+// degrada el render: el DOM crece sin límite mientras el usuario mira.
+var MAX_LIVE_NODES = 300;
 
 var SEV_ORDER = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1, INFO: 0 };
 
@@ -24,6 +30,7 @@ function show(id) {
 function acceptConsent() {
   show("screen-scan");
   document.getElementById("topbar-status").textContent = "Analizando…";
+  document.getElementById("statusbar").classList.add("on");
   window.startScan();
 }
 
@@ -46,6 +53,9 @@ window.onAgentEvent = function (ev) {
     case "collector_done":
       onCollectorDone(ev);
       break;
+    case "finding":
+      onFinding(ev);
+      break;
     case "scan_done":
       onScanDone(ev);
       break;
@@ -56,7 +66,7 @@ window.onAgentEvent = function (ev) {
 };
 
 function onCollectorStart(ev) {
-  document.getElementById("scan-current").textContent = "Analizando " + ev.collector + "…";
+  document.getElementById("progress-current").textContent = "Analizando " + ev.collector;
   document.getElementById("progress-count").textContent = ev.index + " / " + ev.total;
 
   var li = state.collectors[ev.collector];
@@ -91,12 +101,73 @@ function onCollectorDone(ev) {
 
   var pct = ev.total ? Math.round((ev.index / ev.total) * 100) : 0;
   document.getElementById("progress-bar").style.width = pct + "%";
+  document.getElementById("progress-pct").textContent = pct + "%";
   document.getElementById("progress-artifacts").textContent =
-    state.totalArtifacts + " artefactos";
+    state.totalArtifacts.toLocaleString("es") + " artefactos";
+}
+
+// onFinding agrega una detección al feed en vivo. La severidad es preliminar:
+// el backend todavía no aplicó combos ni deduplicación, así que la pantalla
+// final puede mostrar un valor distinto.
+function onFinding(ev) {
+  var feed = document.getElementById("live-feed");
+  var empty = document.getElementById("live-empty");
+  if (empty) empty.remove();
+
+  var sev = (ev.severity || "INFO").toUpperCase();
+  if (state.live[sev] !== undefined) {
+    state.live[sev]++;
+    renderCounters(sev);
+  }
+
+  var item = document.createElement("div");
+  item.className = "live-item lv-" + sev.toLowerCase();
+  item.innerHTML =
+    '<span class="badge sev-' + sev.toLowerCase() + '"></span>' +
+    '<span class="live-title"></span>' +
+    '<span class="live-path"></span>';
+  item.querySelector(".badge").textContent = sev;
+  item.querySelector(".live-title").textContent = ev.title || "";
+  // La ruta se muestra en RTL por CSS para que, al recortarse, se vea el
+  // nombre del archivo y no el prefijo C:\Windows\... que se repite siempre.
+  item.querySelector(".live-path").textContent = ev.path || "";
+
+  feed.insertBefore(item, feed.firstChild);
+  state.liveShown++;
+
+  // Podar el final: lo viejo ya se contabilizó en los contadores y va a
+  // aparecer completo en la pantalla de resultados.
+  while (feed.childNodes.length > MAX_LIVE_NODES) {
+    feed.removeChild(feed.lastChild);
+  }
+}
+
+function renderCounters(bumped) {
+  var box = document.getElementById("live-counters");
+  var order = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
+  for (var i = 0; i < order.length; i++) {
+    var k = order[i];
+    var id = "counter-" + k;
+    var el = document.getElementById(id);
+    if (!el) {
+      el = document.createElement("span");
+      el.id = id;
+      el.className = "counter sev-" + k.toLowerCase();
+      box.appendChild(el);
+    }
+    el.textContent = state.live[k];
+    if (state.live[k] > 0) el.classList.add("on");
+    if (k === bumped) {
+      el.classList.remove("bump");
+      void el.offsetWidth; // reinicia la animación
+      el.classList.add("bump");
+    }
+  }
 }
 
 function onScanError(ev) {
   show("screen-results");
+  document.getElementById("statusbar").classList.remove("on");
   document.getElementById("topbar-status").textContent = "Error";
   var v = document.getElementById("verdict");
   v.className = "verdict level-incompleto";
@@ -108,6 +179,7 @@ function onScanError(ev) {
 
 function onScanDone(ev) {
   show("screen-results");
+  document.getElementById("statusbar").classList.remove("on");
   document.getElementById("topbar-status").textContent = "Completado";
 
   var rep = ev.report || {};

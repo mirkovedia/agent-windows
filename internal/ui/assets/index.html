@@ -62,20 +62,28 @@
   </section>
 
   <!-- ============ 2. ESCANEO ============ -->
-  <section id="screen-scan" class="screen">
-    <div class="card">
-      <h1>Analizando el equipo</h1>
-      <p class="lead" id="scan-current">Preparando…</p>
+  <section id="screen-scan" class="screen screen-wide">
+    <div class="scan-grid">
 
-      <div class="progress">
-        <div class="progress-bar" id="progress-bar"></div>
-      </div>
-      <div class="progress-meta">
-        <span id="progress-count">0 / 0</span>
-        <span id="progress-artifacts">0 artefactos</span>
+      <!-- columna izquierda: fuentes -->
+      <aside class="scan-side">
+        <h2 class="side-title">Fuentes</h2>
+        <ul class="collector-list" id="collector-list"></ul>
+      </aside>
+
+      <!-- columna derecha: hallazgos en vivo -->
+      <div class="scan-main">
+        <div class="live-header">
+          <h2 class="side-title">Detecciones</h2>
+          <div class="live-counters" id="live-counters"></div>
+        </div>
+        <div class="live-feed" id="live-feed">
+          <div class="live-empty" id="live-empty">
+            Todavía no se detectó nada relevante.
+          </div>
+        </div>
       </div>
 
-      <ul class="collector-list" id="collector-list"></ul>
     </div>
   </section>
 
@@ -98,6 +106,22 @@
   </section>
 
 </main>
+
+<!-- Barra de progreso fija al pie. Solo visible durante el escaneo. -->
+<footer class="statusbar" id="statusbar">
+  <div class="statusbar-track">
+    <div class="statusbar-fill" id="progress-bar"></div>
+  </div>
+  <div class="statusbar-info">
+    <span class="statusbar-current" id="progress-current">Preparando…</span>
+    <span class="statusbar-right">
+      <span id="progress-artifacts">0 artefactos</span>
+      <span class="statusbar-sep">·</span>
+      <span id="progress-count">0 / 0</span>
+      <span class="statusbar-pct" id="progress-pct">0%</span>
+    </span>
+  </div>
+</footer>
 
 <!--INLINE_JS-->
 </body>

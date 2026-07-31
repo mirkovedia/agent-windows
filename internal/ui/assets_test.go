@@ -61,6 +61,35 @@ func TestPageHandlesEverySeverity(t *testing.T) {
 	}
 }
 
+// TestPageHasLiveScanElements fija los elementos que el feed en vivo necesita.
+// Si alguno se renombra, las detecciones dejarían de aparecer sin ningún error
+// visible: el JS fallaría en silencio dentro del WebView.
+func TestPageHasLiveScanElements(t *testing.T) {
+	page := Page()
+	for _, id := range []string{
+		"live-feed",      // contenedor de detecciones en vivo
+		"live-counters",  // contadores por severidad
+		"collector-list", // lista de fuentes
+		"statusbar",      // barra de progreso al pie
+		"progress-bar",   // relleno de la barra
+		"progress-pct",   // porcentaje
+		"progress-count", // N / total
+	} {
+		if !strings.Contains(page, id) {
+			t.Errorf("falta el elemento %q que usa la vista en vivo", id)
+		}
+	}
+}
+
+// TestPageHandlesFindingEvent verifica que la UI despache el evento de
+// hallazgo en vivo, que es el que hace que las detecciones aparezcan mientras
+// el escaneo corre.
+func TestPageHandlesFindingEvent(t *testing.T) {
+	if !strings.Contains(Page(), `case "finding"`) {
+		t.Error("la UI debe manejar el evento finding")
+	}
+}
+
 // TestPageHandlesEveryVerdictLevel hace lo mismo con los niveles de veredicto.
 func TestPageHandlesEveryVerdictLevel(t *testing.T) {
 	page := Page()

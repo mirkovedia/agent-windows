@@ -15,21 +15,32 @@ import (
 const (
 	KindCollectorStart = "collector_start"
 	KindCollectorDone  = "collector_done"
-	KindScanDone       = "scan_done"
-	KindScanError      = "scan_error"
+	// KindFinding es un hallazgo mostrado mientras el escaneo corre. Su
+	// severidad es PRELIMINAR: no incluye combos ni deduplicación, que
+	// necesitan el escaneo terminado. La pantalla final es la autoritativa.
+	KindFinding   = "finding"
+	KindScanDone  = "scan_done"
+	KindScanError = "scan_error"
 )
 
 // Event es lo que la UI recibe durante el ciclo de vida del escaneo.
 // Un solo tipo para todo el ciclo mantiene el puente Go↔JS con una única
 // forma que validar.
 type Event struct {
-	Kind      string         `json:"kind"`
-	Collector string         `json:"collector,omitempty"`
-	Index     int            `json:"index,omitempty"`
-	Total     int            `json:"total,omitempty"`
-	Artifacts int            `json:"artifacts,omitempty"`
-	Error     string         `json:"error,omitempty"`
-	Report    *report.Report `json:"report,omitempty"`
+	Kind      string `json:"kind"`
+	Collector string `json:"collector,omitempty"`
+	Index     int    `json:"index,omitempty"`
+	Total     int    `json:"total,omitempty"`
+	Artifacts int    `json:"artifacts,omitempty"`
+	Error     string `json:"error,omitempty"`
+
+	// Campos de KindFinding.
+	Severity string `json:"severity,omitempty"`
+	Category string `json:"category,omitempty"`
+	Title    string `json:"title,omitempty"`
+	Path     string `json:"path,omitempty"`
+
+	Report *report.Report `json:"report,omitempty"`
 }
 
 // JSON serializa el evento para pasarlo a JavaScript.

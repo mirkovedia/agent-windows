@@ -21,6 +21,7 @@ import (
 	"github.com/telagem/agent-windows/internal/report"
 	"github.com/telagem/agent-windows/internal/transport"
 	"github.com/telagem/agent-windows/internal/ui"
+	"github.com/telagem/agent-windows/internal/verdict"
 	"golang.org/x/sys/windows"
 )
 
@@ -153,6 +154,10 @@ func runGUI(timeout time.Duration, outPath string, elevated bool) error {
 						})
 					},
 					OnFinish: func(i, total int, res collector.Result) {
+						// Mostrar los hallazgos notables apenas se descubren,
+						// antes de que termine el escaneo completo.
+						streamFindings(res, emit)
+
 						ev := ui.Event{
 							Kind:  ui.KindCollectorDone,
 							Index: i, Total: total,
@@ -174,6 +179,43 @@ func runGUI(timeout time.Duration, outPath string, elevated bool) error {
 			emit(ui.Event{Kind: ui.KindScanDone, Report: &rep})
 		},
 	})
+}
+
+// maxLiveFindingsPerCollector acota cuántos hallazgos se empujan a la vista en
+// vivo por colector. El USN puede traer miles de artefactos; pasada cierta
+// cantidad la lista deja de ser información y pasa a ser ruido, además de
+// castigar al render.
+const maxLiveFindingsPerCollector = 150
+
+// streamFindings empuja a la interfaz los hallazgos notables de un colector
+// apenas termina, sin esperar al escaneo completo.
+//
+// La severidad que se muestra es preliminar (ver verdict.Preview): los combos
+// y la deduplicación se aplican recién al final, así que un hallazgo puede
+// aparecer acá como HIGH y terminar como CRITICAL en la pantalla final.
+func streamFindings(res collector.Result, emit func(ui.Event)) {
+	if res.Err != nil {
+		return
+	}
+	shown := 0
+	for _, a := range res.Artifacts {
+		if shown >= maxLiveFindingsPerCollector {
+			return
+		}
+		p := verdict.Preview(a)
+		if !p.Notable {
+			continue
+		}
+		shown++
+		emit(ui.Event{
+			Kind:      ui.KindFinding,
+			Severity:  p.Severity,
+			Category:  p.Category,
+			Title:     p.Title,
+			Path:      a.Source,
+			Collector: res.Collector,
+		})
+	}
 }
 
 // runConsole conserva el flujo original: consentimiento por stdin y salida por
