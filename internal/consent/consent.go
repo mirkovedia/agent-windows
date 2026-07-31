@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -23,8 +24,15 @@ func CollectionSummary() []string {
 	}
 }
 
+// ErrNoInput indica que no se pudo leer una respuesta del jugador (entrada
+// cerrada o no interactiva). Es distinto de un rechazo explícito: nadie dijo
+// que no, simplemente no había con quién hablar.
+var ErrNoInput = errors.New("no se pudo leer la respuesta del jugador")
+
 // Prompt muestra el resumen y espera la aceptación explícita del jugador.
-func Prompt(in io.Reader, out io.Writer) (bool, time.Time) {
+// Devuelve ErrNoInput si la entrada no es legible; en ese caso el llamador debe
+// tratarlo como un problema de ejecución, no como un rechazo.
+func Prompt(in io.Reader, out io.Writer) (bool, time.Time, error) {
 	for _, line := range CollectionSummary() {
 		fmt.Fprintln(out, line)
 	}
@@ -32,13 +40,16 @@ func Prompt(in io.Reader, out io.Writer) (bool, time.Time) {
 
 	scanner := bufio.NewScanner(in)
 	if !scanner.Scan() {
-		return false, time.Time{}
+		if err := scanner.Err(); err != nil {
+			return false, time.Time{}, fmt.Errorf("%w: %v", ErrNoInput, err)
+		}
+		return false, time.Time{}, ErrNoInput
 	}
 	answer := strings.TrimSpace(strings.ToLower(scanner.Text()))
 	if answer == "si" || answer == "sí" || answer == "s" {
-		return true, time.Now()
+		return true, time.Now(), nil
 	}
-	return false, time.Time{}
+	return false, time.Time{}, nil
 }
 
 // HashIdentifier anonimiza un ID de hardware con SHA-256(nonce||raw). Usar el
