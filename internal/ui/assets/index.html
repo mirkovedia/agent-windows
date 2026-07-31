@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Mirkkkov PC</title>
+<!--INLINE_CSS-->
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="dot"></span>
+    <span class="brand-name">Mirkkkov PC</span>
+    <span class="brand-sub">Verificación forense</span>
+  </div>
+  <div class="topbar-right" id="topbar-status"></div>
+</header>
+
+<main>
+
+  <!-- ============ 1. CONSENTIMIENTO ============ -->
+  <section id="screen-consent" class="screen active">
+    <div class="card">
+      <h1>Antes de empezar</h1>
+      <p class="lead">
+        Esta revisión analiza rastros que tu propia computadora ya guarda sobre
+        qué programas se ejecutaron y qué archivos se borraron.
+      </p>
+
+      <div class="cols">
+        <div class="col col-yes">
+          <h2>Qué se revisa</h2>
+          <ul>
+            <li>Nombres, hashes y fechas de programas ejecutados</li>
+            <li>Rastros de borrado de archivos</li>
+            <li>Servicios y tareas programadas del sistema</li>
+            <li>Registros de eventos de Windows</li>
+          </ul>
+        </div>
+        <div class="col col-no">
+          <h2>Qué NO se toca</h2>
+          <ul>
+            <li>Documentos, fotos y videos</li>
+            <li>Mensajes y conversaciones</li>
+            <li>Contraseñas y cookies</li>
+            <li>Historial de navegación</li>
+          </ul>
+        </div>
+      </div>
+
+      <p class="fineprint">
+        Solo se leen <strong>metadatos</strong>, nunca el contenido de tus archivos.
+        Los identificadores de hardware se anonimizan. El reporte queda guardado
+        en tu equipo y podés leerlo entero.
+      </p>
+
+      <div class="actions">
+        <button class="btn btn-ghost" onclick="rejectConsent()">Rechazar</button>
+        <button class="btn btn-primary" onclick="acceptConsent()">Acepto, iniciar revisión</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2. ESCANEO ============ -->
+  <section id="screen-scan" class="screen">
+    <div class="card">
+      <h1>Analizando el equipo</h1>
+      <p class="lead" id="scan-current">Preparando…</p>
+
+      <div class="progress">
+        <div class="progress-bar" id="progress-bar"></div>
+      </div>
+      <div class="progress-meta">
+        <span id="progress-count">0 / 0</span>
+        <span id="progress-artifacts">0 artefactos</span>
+      </div>
+
+      <ul class="collector-list" id="collector-list"></ul>
+    </div>
+  </section>
+
+  <!-- ============ 3. RESULTADOS ============ -->
+  <section id="screen-results" class="screen">
+    <div class="verdict" id="verdict">
+      <div class="verdict-level" id="verdict-level">—</div>
+      <div class="verdict-summary" id="verdict-summary"></div>
+      <div class="verdict-note" id="verdict-note"></div>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="findings" id="findings"></div>
+
+    <div class="results-footer">
+      <span class="report-path" id="report-path"></span>
+      <button class="btn btn-ghost" onclick="closeApp()">Cerrar</button>
+    </div>
+  </section>
+
+</main>
+
+<!--INLINE_JS-->
+</body>
+</html>
