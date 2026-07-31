@@ -13,11 +13,26 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -o agent.exe ./cmd/ag
 
 ## Ejecución
 
-Requiere privilegios de administrador. Clic derecho → Ejecutar como administrador.
+Requiere privilegios de administrador. **Abrí primero una consola como
+administrador** y ejecutá el agente desde ahí; no lo abras con doble clic ni con
+clic derecho desde el Explorador, porque necesita argumentos y porque la ventana
+se cierra al terminar el proceso, sin darte tiempo a leer el resultado.
+
+Hay que indicar dónde entregar el reporte. Contra un servidor de verificación:
 
 ```
 agent.exe -server https://<servidor-de-verificacion> -timeout 10m
 ```
+
+O en modo local, sin servidor, escribiendo el reporte a un archivo:
+
+```
+agent.exe -out reporte.json -timeout 10m
+```
+
+El modo local sirve para inspeccionar qué detecta el agente. El reporte que
+genera conserva la cadena de hash y la firma, pero **no está verificado por un
+tercero**: no equivale a la evidencia de una sesión validada contra el servidor.
 
 ## Privacidad
 
