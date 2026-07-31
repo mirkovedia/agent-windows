@@ -12,3 +12,4 @@ salida.txt
 **/testdata/*.expected
 **/testdata/*.hve
 **/testdata/*.pf
+*.exe~
