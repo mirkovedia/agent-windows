@@ -90,12 +90,21 @@
   <!-- ============ 3. RESULTADOS ============ -->
   <section id="screen-results" class="screen">
     <div class="verdict" id="verdict">
-      <div class="verdict-level" id="verdict-level">—</div>
+      <div class="verdict-head">
+        <span class="verdict-label">Resultado</span>
+        <span class="verdict-level" id="verdict-level">—</span>
+      </div>
       <div class="verdict-summary" id="verdict-summary"></div>
-      <div class="verdict-note" id="verdict-note"></div>
-    </div>
 
-    <div class="stats" id="stats"></div>
+      <!-- Distribución real de la evidencia. Un CRITICAL entre 300 hallazgos
+           se ve como lo que es, no como el titular. -->
+      <div class="dist">
+        <div class="dist-bar" id="dist-bar"></div>
+        <div class="dist-legend" id="dist-legend"></div>
+      </div>
+
+      <div class="verdict-note" id="verdict-note" hidden></div>
+    </div>
 
     <div class="findings" id="findings"></div>
 

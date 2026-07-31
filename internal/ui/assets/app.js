@@ -187,7 +187,7 @@ function onScanDone(ev) {
   var findings = rep.findings || [];
 
   renderVerdict(verdict);
-  renderStats(findings);
+  renderDistribution(findings);
   renderFindings(findings);
 
   if (rep.reportPath) {
@@ -211,40 +211,55 @@ function renderVerdict(verdict) {
   document.getElementById("verdict-level").textContent = LABEL[level] || level;
   document.getElementById("verdict-summary").textContent = verdict.summary || "";
 
-  var note = "";
+  var noteEl = document.getElementById("verdict-note");
   if (verdict.failedCollectors && verdict.failedCollectors.length) {
-    note =
-      "No se pudieron revisar " +
-      verdict.failedCollectors.length +
-      " fuentes: " +
+    noteEl.textContent =
+      "Revisión parcial: no se pudo leer " +
       verdict.failedCollectors.join(", ") +
-      ". El resultado es parcial.";
+      ". Lo que esa fuente hubiera mostrado no está en este resultado.";
+    noteEl.hidden = false;
+  } else {
+    noteEl.hidden = true;
   }
-  document.getElementById("verdict-note").textContent = note;
 }
 
-function renderStats(findings) {
+// renderDistribution dibuja la proporción real de la evidencia. Un CRITICAL
+// entre 300 hallazgos se ve del tamaño que le corresponde, no como titular.
+function renderDistribution(findings) {
   var counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
   for (var i = 0; i < findings.length; i++) {
     var s = findings[i].severity;
     if (counts[s] !== undefined) counts[s]++;
   }
+
   var order = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"];
-  var html = "";
+  var total = findings.length || 1;
+  var bar = document.getElementById("dist-bar");
+  var legend = document.getElementById("dist-legend");
+  bar.innerHTML = "";
+  legend.innerHTML = "";
+
   for (var j = 0; j < order.length; j++) {
     var k = order[j];
-    html +=
-      '<div class="stat"><div class="stat-num sev-text-' +
-      k.toLowerCase() +
-      '" style="color:var(--sev-' +
-      k.toLowerCase() +
-      ')">' +
-      counts[k] +
-      '</div><div class="stat-label">' +
-      k +
-      "</div></div>";
+    if (!counts[k]) continue;
+    var color = "var(--sev-" + k.toLowerCase() + ")";
+
+    var seg = document.createElement("div");
+    seg.className = "dist-seg";
+    seg.style.width = (counts[k] / total) * 100 + "%";
+    seg.style.background = color;
+    seg.title = counts[k] + " " + k;
+    bar.appendChild(seg);
+
+    var item = document.createElement("span");
+    item.className = "dist-item";
+    item.innerHTML =
+      '<span class="dist-swatch" style="background:' + color + '"></span>' +
+      '<span class="dist-num"></span><span></span>';
+    item.querySelector(".dist-num").textContent = counts[k];
+    item.querySelectorAll("span")[2].textContent = k;
+    legend.appendChild(item);
   }
-  document.getElementById("stats").innerHTML = html;
 }
 
 function renderFindings(findings) {
@@ -319,20 +334,50 @@ function buildGroup(category, items) {
   return group;
 }
 
+// revealable reproduce del lado del cliente la misma regla que ui.RevealablePath:
+// solo las rutas reales del disco reciben botón de carpeta. Una tarea
+// programada o un nombre de servicio no tienen ubicación que abrir.
+function revealable(path) {
+  if (!path) return false;
+  if (path.indexOf("<sin-resolver>") !== -1) return false;
+  if (/^[A-Za-z]:[\\/]/.test(path)) return true;
+  return path.indexOf("\\\\") === 0;
+}
+
 function buildFinding(f) {
   var el = document.createElement("div");
   el.className = "finding";
 
   var sev = (f.severity || "INFO").toLowerCase();
   el.innerHTML =
-    '<div class="finding-head">' +
     '<span class="badge sev-' + sev + '"></span>' +
-    '<span class="finding-title"></span>' +
-    "</div>" +
-    '<div class="finding-path"></div>';
+    '<div class="finding-main">' +
+    '<div class="finding-title"></div>' +
+    '<div class="finding-path"></div>' +
+    "</div>";
 
   el.querySelector(".badge").textContent = f.severity || "INFO";
   el.querySelector(".finding-title").textContent = f.title || "";
   el.querySelector(".finding-path").textContent = f.artifact || "";
+
+  if (revealable(f.artifact)) {
+    var btn = document.createElement("button");
+    btn.className = "reveal";
+    btn.textContent = "\u{1F5C1}";
+    btn.title = "Abrir la ubicación en el explorador";
+    btn.setAttribute("aria-label", "Abrir la ubicación de " + (f.artifact || ""));
+    btn.onclick = function () {
+      // El backend valida de nuevo: el archivo puede haber sido borrado, en
+      // cuyo caso abre el directorio que lo contenía.
+      window.revealPath(f.artifact).then(function (ok) {
+        if (!ok) {
+          btn.title = "La ubicación ya no existe";
+          return;
+        }
+        btn.classList.add("done");
+      });
+    };
+    el.appendChild(btn);
+  }
   return el;
 }

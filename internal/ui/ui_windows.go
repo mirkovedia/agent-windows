@@ -59,6 +59,13 @@ func Run(opts Options) error {
 	}); err != nil {
 		return err
 	}
+	// revealPath abre el explorador en la ubicación del artefacto. Es lo que
+	// permite pasar del hallazgo al archivo sin copiar rutas a mano.
+	if err := w.Bind("revealPath", func(path string) bool {
+		return Reveal(path) == nil
+	}); err != nil {
+		return err
+	}
 
 	w.SetHtml(Page())
 	w.Run()

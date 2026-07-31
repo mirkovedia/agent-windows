@@ -43,7 +43,7 @@ func TestPageExposesEventEntryPoint(t *testing.T) {
 // fallo es silencioso.
 func TestPageBindsBackendFunctions(t *testing.T) {
 	page := Page()
-	for _, fn := range []string{"window.startScan", "window.closeApp"} {
+	for _, fn := range []string{"window.startScan", "window.closeApp", "window.revealPath"} {
 		if !strings.Contains(page, fn) {
 			t.Errorf("la UI debe invocar %s", fn)
 		}
