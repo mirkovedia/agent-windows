@@ -7,31 +7,37 @@ en la máquina, con el jugador presente y previa aceptación explícita.
 ## Build
 
 ```bash
-CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -o mirkkkov.exe ./cmd/agent
+CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-H windowsgui" -o mirkkkov.exe ./cmd/agent
 ```
+
+El flag `-H windowsgui` evita que el doble clic abra una ventana de consola
+detrás de la interfaz. El modo consola sigue funcionando: el agente se engancha
+a la terminal desde la que se lo invocó.
 
 ## Ejecución
 
-Requiere privilegios de administrador. **Abrí primero una consola como
-administrador** y ejecutá el agente desde ahí; no lo abras con doble clic ni con
-clic derecho desde el Explorador, porque necesita argumentos y porque la ventana
-se cierra al terminar el proceso, sin darte tiempo a leer el resultado.
+**Doble clic en `mirkkkov.exe`.** Nada más.
 
-Hay que indicar dónde entregar el reporte. Contra un servidor de verificación:
+El agente pide elevación por UAC solo, abre su propia ventana, muestra qué
+revisa y qué no, y espera tu consentimiento explícito antes de tocar nada.
+Durante el escaneo vas viendo el avance de cada fuente, y al final el veredicto
+con los hallazgos agrupados por categoría.
+
+El reporte queda como `reporte.json` junto al ejecutable.
+
+### Modo consola
+
+Para automatizar o cuando no hay interfaz disponible:
 
 ```
-mirkkkov.exe -server https://<servidor-de-verificacion> -timeout 10m
+mirkkkov.exe -console                                    # reporte junto al .exe
+mirkkkov.exe -console -out reporte.json -timeout 10m     # ruta explícita
+mirkkkov.exe -console -server https://<servidor>          # contra un servidor
 ```
 
-O en modo local, sin servidor, escribiendo el reporte a un archivo:
-
-```
-mirkkkov.exe -out reporte.json -timeout 10m
-```
-
-El modo local sirve para inspeccionar qué detecta el agente. El reporte que
-genera conserva la cadena de hash y la firma, pero **no está verificado por un
-tercero**: no equivale a la evidencia de una sesión validada contra el servidor.
+El reporte local conserva la cadena de hash y la firma, pero **no está
+verificado por un tercero**: no equivale a la evidencia de una sesión validada
+contra el servidor.
 
 ## Privacidad
 
