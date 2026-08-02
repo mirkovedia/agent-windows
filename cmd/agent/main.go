@@ -140,7 +140,7 @@ func runGUI(timeout time.Duration, outPath string, elevated bool) error {
 		outPath = defaultReportPath()
 	}
 	return ui.Run(ui.Options{
-		Title: "Mirkkkov PC — Verificación forense",
+		Title: "Mirkkkov",
 		OnScan: func(emit func(ui.Event)) {
 			opts := agent.Options{
 				Timeout: timeout,

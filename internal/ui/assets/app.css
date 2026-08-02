@@ -1,5 +1,5 @@
 /* ============================================================
-   Mirkkkov PC — instrumento de verificación
+   Mirkkkov — instrumento de verificación
 
    La dirección visual es "instrumento de medición", no "panel de
    seguridad". Dos personas miran esta pantalla al mismo tiempo: quien
@@ -93,8 +93,39 @@ body {
   font-family: var(--mono); letter-spacing: .4px;
 }
 .topbar-right {
+  display: flex; align-items: center; gap: 12px;
   color: var(--text-dim); font-size: 11px;
   font-family: var(--mono); letter-spacing: .6px; text-transform: uppercase;
+}
+
+/* Ecualizador de actividad. Cinco barras con fases distintas: irregular a
+   propósito, porque una animación perfectamente sincronizada se lee como
+   adorno y no como señal. */
+.wave { display: flex; align-items: flex-end; gap: 2px; height: 13px; }
+.wave i {
+  width: 2px; background: var(--accent); border-radius: 1px;
+  animation: eq .9s ease-in-out infinite;
+}
+.wave i:nth-child(1) { height: 40%; animation-delay: 0s; }
+.wave i:nth-child(2) { height: 75%; animation-delay: .18s; }
+.wave i:nth-child(3) { height: 100%; animation-delay: .34s; }
+.wave i:nth-child(4) { height: 60%; animation-delay: .12s; }
+.wave i:nth-child(5) { height: 85%; animation-delay: .45s; }
+@keyframes eq {
+  0%, 100% { transform: scaleY(.35); opacity: .55; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+
+/* Anillo expansivo sobre el punto de marca mientras escanea. */
+.dot.live::after {
+  content: ""; position: absolute; inset: -4px;
+  border-radius: 50%; border: 1px solid var(--accent);
+  animation: ring 1.8s ease-out infinite;
+}
+.dot { position: relative; }
+@keyframes ring {
+  0% { transform: scale(.6); opacity: .9; }
+  100% { transform: scale(2.4); opacity: 0; }
 }
 
 main { flex: 1; overflow-y: auto; padding: 26px 22px 30px; }
@@ -168,6 +199,22 @@ h1 { font-size: 21px; font-weight: 600; letter-spacing: -.2px; margin-bottom: 8p
   background: var(--bg-elev); border: 1px solid var(--border);
   border-radius: 10px; padding: 16px;
 }
+.scan-main { position: relative; overflow: hidden; }
+
+/* Barrido vertical continuo sobre el panel de detecciones. Es la señal de
+   que el instrumento sigue leyendo aunque pasen segundos sin resultados: un
+   panel quieto se lee como colgado. */
+.sweep {
+  position: absolute; left: 0; right: 0; top: 0; height: 120px;
+  pointer-events: none; opacity: 0; z-index: 1;
+  background: linear-gradient(180deg,
+    transparent, rgba(242,128,31,.055) 55%, rgba(242,128,31,.11) 78%, transparent);
+}
+.sweep.on { opacity: 1; animation: sweep 2.6s linear infinite; }
+@keyframes sweep {
+  0% { transform: translateY(-130px); }
+  100% { transform: translateY(calc(100vh - 200px)); }
+}
 
 .collector-list { list-style: none; }
 .collector-list li {
@@ -178,6 +225,18 @@ h1 { font-size: 21px; font-weight: 600; letter-spacing: -.2px; margin-bottom: 8p
 }
 .collector-list li.running {
   border-color: var(--accent); background: var(--accent-soft);
+  position: relative; overflow: hidden;
+}
+/* Destello que recorre la fuente que se está leyendo en este momento. */
+.collector-list li.running::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg,
+    transparent, rgba(242,128,31,.16), transparent);
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 .collector-list li.done { background: var(--bg-soft); }
 .collector-list li.failed { border-color: var(--sev-medium); background: rgba(217,164,65,.07); }
@@ -220,12 +279,30 @@ li.failed .c-icon { color: var(--sev-medium); }
   padding: 8px 10px; border-radius: 6px;
   background: var(--bg-soft);
   border-left: 2px solid var(--sev-info);
-  animation: slidein .28s ease;
-  flex-shrink: 0;
+  animation: slidein .34s cubic-bezier(.22,.9,.3,1);
+  flex-shrink: 0; position: relative; z-index: 2;
 }
+/* Entra corrido, apenas escalado y con la altura abriéndose: da la sensación
+   de que la lista lo empuja hacia adentro en vez de aparecer de la nada. */
 @keyframes slidein {
-  from { opacity: 0; transform: translateX(-12px); }
-  to { opacity: 1; transform: none; }
+  0% { opacity: 0; transform: translateX(-18px) scale(.97); max-height: 0; }
+  60% { opacity: 1; }
+  100% { opacity: 1; transform: none; max-height: 60px; }
+}
+
+/* Destello del color de la severidad al entrar: cuanto más grave, más se
+   nota. Un CRITICAL no debería poder pasar desapercibido. */
+.live-item::before {
+  content: ""; position: absolute; inset: 0; border-radius: 6px;
+  pointer-events: none; opacity: 0;
+  animation: flash .8s ease-out;
+}
+.live-item.lv-medium::before { background: var(--sev-medium); }
+.live-item.lv-high::before { background: var(--sev-high); }
+.live-item.lv-critical::before { background: var(--sev-critical); }
+@keyframes flash {
+  0% { opacity: .3; }
+  100% { opacity: 0; }
 }
 .live-item.lv-low { border-left-color: var(--sev-low); }
 .live-item.lv-medium { border-left-color: var(--sev-medium); }
@@ -243,6 +320,25 @@ li.failed .c-icon { color: var(--sev-medium); }
 .verdict {
   border: 1px solid var(--border); border-radius: 10px;
   background: var(--bg-elev); margin-bottom: 14px; overflow: hidden;
+  animation: verdictIn .5s cubic-bezier(.22,.9,.3,1);
+}
+@keyframes verdictIn {
+  from { opacity: 0; transform: translateY(-10px) scale(.99); }
+  to { opacity: 1; transform: none; }
+}
+/* El veredicto se revela letra a letra: el instrumento termina de imprimir
+   su lectura. Dura poco a propósito, no es un efecto de máquina de escribir. */
+.verdict-level { overflow: hidden; white-space: nowrap; }
+.verdict-level.reveal-type {
+  animation: typeIn .55s steps(18, end) .15s both;
+}
+@keyframes typeIn { from { max-width: 0; } to { max-width: 100%; } }
+
+/* Los grupos entran escalonados, de a uno. */
+.group { animation: groupIn .4s ease both; }
+@keyframes groupIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
 }
 .verdict-head {
   display: flex; align-items: baseline; gap: 14px;
@@ -365,12 +461,24 @@ li.failed .c-icon { color: var(--sev-medium); }
   border-top: 1px solid var(--border); display: none;
 }
 .statusbar.on { display: block; }
-.statusbar-track { height: 2px; background: var(--bg-soft); overflow: hidden; }
+.statusbar-track { height: 3px; background: var(--bg-soft); overflow: hidden; }
 .statusbar-fill {
-  height: 100%; width: 0%;
+  height: 100%; width: 0%; position: relative; overflow: hidden;
   background: var(--accent);
-  box-shadow: 0 0 10px rgba(242,128,31,.65);
-  transition: width .45s ease;
+  box-shadow: 0 0 12px rgba(242,128,31,.7);
+  transition: width .45s cubic-bezier(.22,.9,.3,1);
+}
+/* Franjas en movimiento: el relleno queda quieto entre colectores, y sin
+   esto parecería trabado durante los segundos que tarda cada fuente. */
+.statusbar-fill::after {
+  content: ""; position: absolute; inset: 0;
+  background: repeating-linear-gradient(115deg,
+    rgba(255,255,255,.22) 0 8px, transparent 8px 18px);
+  animation: stripes .7s linear infinite;
+}
+@keyframes stripes {
+  0% { background-position: 0 0; }
+  100% { background-position: 40px 0; }
 }
 .statusbar-info {
   display: flex; align-items: center; justify-content: space-between;

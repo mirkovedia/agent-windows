@@ -2,18 +2,24 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<title>Mirkkkov PC</title>
+<title>Mirkkkov</title>
 <!--INLINE_CSS-->
 </head>
 <body>
 
 <header class="topbar">
   <div class="brand">
-    <span class="dot"></span>
-    <span class="brand-name">Mirkkkov PC</span>
+    <span class="dot" id="brand-dot"></span>
+    <span class="brand-name">Mirkkkov</span>
     <span class="brand-sub">Verificación forense</span>
   </div>
-  <div class="topbar-right" id="topbar-status"></div>
+  <div class="topbar-right">
+    <!-- Ecualizador: la señal de que el instrumento está trabajando. -->
+    <span class="wave" id="wave" hidden>
+      <i></i><i></i><i></i><i></i><i></i>
+    </span>
+    <span id="topbar-status"></span>
+  </div>
 </header>
 
 <main>
@@ -72,7 +78,10 @@
       </aside>
 
       <!-- columna derecha: hallazgos en vivo -->
-      <div class="scan-main">
+      <div class="scan-main" id="scan-main">
+        <!-- Barrido: señala que el panel sigue leyendo aunque no aparezca
+             nada nuevo durante varios segundos. -->
+        <div class="sweep" id="sweep"></div>
         <div class="live-header">
           <h2 class="side-title">Detecciones</h2>
           <div class="live-counters" id="live-counters"></div>
@@ -124,7 +133,7 @@
   <div class="statusbar-info">
     <span class="statusbar-current" id="progress-current">Preparando…</span>
     <span class="statusbar-right">
-      <span id="progress-artifacts">0 artefactos</span>
+      <span><span id="progress-artifacts-n" data-v="0">0</span> artefactos</span>
       <span class="statusbar-sep">·</span>
       <span id="progress-count">0 / 0</span>
       <span class="statusbar-pct" id="progress-pct">0%</span>

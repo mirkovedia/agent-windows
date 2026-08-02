@@ -81,6 +81,32 @@ func TestPageHasLiveScanElements(t *testing.T) {
 	}
 }
 
+// TestPageHasActivityIndicators fija las señales de que el escaneo está
+// corriendo. Si alguna se rompe, la interfaz se ve congelada durante los
+// segundos que tarda cada fuente y parece colgada.
+func TestPageHasActivityIndicators(t *testing.T) {
+	page := Page()
+	for _, id := range []string{"wave", "sweep", "brand-dot"} {
+		if !strings.Contains(page, id) {
+			t.Errorf("falta el indicador de actividad %q", id)
+		}
+	}
+	if !strings.Contains(page, "setScanning") {
+		t.Error("la UI debe encender y apagar la actividad en un solo lugar")
+	}
+}
+
+// TestPageUsesShortName protege el nombre del producto en la interfaz.
+func TestPageUsesShortName(t *testing.T) {
+	page := Page()
+	if strings.Contains(page, "Mirkkkov PC") {
+		t.Error("el producto se llama Mirkkkov, sin PC")
+	}
+	if !strings.Contains(page, "Mirkkkov") {
+		t.Error("falta el nombre del producto")
+	}
+}
+
 // TestPageHandlesFindingEvent verifica que la UI despache el evento de
 // hallazgo en vivo, que es el que hace que las detecciones aparezcan mientras
 // el escaneo corre.
