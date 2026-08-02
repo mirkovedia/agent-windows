@@ -313,7 +313,13 @@ li.failed .c-icon { color: var(--sev-medium); }
   flex: 1; color: var(--text-faint); font-size: 11.5px;
   font-family: var(--mono);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  direction: rtl; text-align: left;
+  /* Recorta por el principio para dejar visible el nombre del archivo, que es
+     lo único que cambia entre rutas. unicode-bidi:plaintext es imprescindible:
+     con direction:rtl a secas, el algoritmo bidireccional reordena las barras
+     invertidas y las rutas se leen mal (aparece una "\" al final que no
+     existe en el dato). Con plaintext, el primer carácter fuerte decide la
+     dirección del texto y solo el recorte queda del lado izquierdo. */
+  direction: rtl; unicode-bidi: plaintext; text-align: left;
 }
 
 /* ---------------- veredicto: lectura de instrumento ---------------- */
@@ -421,7 +427,13 @@ li.failed .c-icon { color: var(--sev-medium); }
   color: var(--text-faint); font-size: 11.5px; margin-top: 3px;
   font-family: var(--mono);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  direction: rtl; text-align: left;
+  /* Recorta por el principio para dejar visible el nombre del archivo, que es
+     lo único que cambia entre rutas. unicode-bidi:plaintext es imprescindible:
+     con direction:rtl a secas, el algoritmo bidireccional reordena las barras
+     invertidas y las rutas se leen mal (aparece una "\" al final que no
+     existe en el dato). Con plaintext, el primer carácter fuerte decide la
+     dirección del texto y solo el recorte queda del lado izquierdo. */
+  direction: rtl; unicode-bidi: plaintext; text-align: left;
 }
 
 /* Botón de carpeta: sin borde hasta que se lo necesita. */

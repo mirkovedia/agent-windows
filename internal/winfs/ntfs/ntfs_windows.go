@@ -141,8 +141,17 @@ func ScanDeleted(ctx context.Context, volume string) ([]DeletedEntry, error) {
 	finish := func() []DeletedEntry {
 		out := make([]DeletedEntry, 0, len(pending))
 		for _, p := range pending {
+			full := ntfspath.ResolvePath(parentMap, p.parentRef, p.fileName)
+			// Windows Update borra y reemplaza miles de archivos del almacén
+			// de componentes en cada actualización. El nombre suelto no los
+			// delata ("oobeldr.exe", "ci.dll"): el token de Microsoft vive en
+			// el directorio, así que este filtro solo puede aplicarse acá,
+			// con la ruta ya reconstruida.
+			if fsforensic.IsSystemComponent(full) {
+				continue
+			}
 			out = append(out, DeletedEntry{
-				FullPath: ntfspath.ResolvePath(parentMap, p.parentRef, p.fileName),
+				FullPath: full,
 				FileName: p.fileName,
 				SI:       p.si,
 				FN:       p.fn,

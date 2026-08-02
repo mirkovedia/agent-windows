@@ -103,15 +103,28 @@ func tamperSignalRule(a collector.Artifact, r Rule) Rule {
 // radicalmente lo que significa.
 func desyncTaskRule(a collector.Artifact, r Rule) Rule {
 	var payload struct {
-		Kind string
+		Kind    string
+		RelPath string
 	}
 	if err := json.Unmarshal(a.Data, &payload); err != nil {
 		return r // payload ilegible: se queda con la regla base
 	}
 	switch payload.Kind {
 	case "hive_only":
-		// El XML fue borrado pero la entrada sigue en TaskCache: alguien
-		// borró el archivo visible y no pudo limpiar el registro.
+		if strings.HasPrefix(strings.ToLower(payload.RelPath), `microsoft\`) {
+			// Windows guarda varias de sus tareas propias SOLO en el
+			// registro, sin XML en disco. Se verificó sobre una máquina real:
+			// el escaneo enumeró el árbol completo sin un solo error de
+			// permisos y estas tareas igual no tenían archivo. Para el
+			// subárbol Microsoft\ la señal no distingue un borrado
+			// deliberado de cómo Windows guarda sus cosas.
+			r.Severity = SevInfo
+			r.Confidence = 0.0
+			break
+		}
+		// Fuera de Microsoft\ sí es señal: el XML fue borrado pero la entrada
+		// sigue en TaskCache, o sea que alguien borró el archivo visible y no
+		// pudo limpiar el registro.
 		r.Severity = SevHigh
 		r.Confidence = 0.8
 	case "file_only":

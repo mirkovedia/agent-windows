@@ -106,6 +106,37 @@ func TestEscalateDesyncHiveOnly(t *testing.T) {
 	}
 }
 
+// TestEscalateDesyncHiveOnlyMicrosoftIsInfo usa las tareas exactas que la
+// tercera ejecución real reportó como HIGH. El diagnóstico de enumeración
+// salió en cero: el árbol se leyó completo y estas igual no tenían XML, o sea
+// que Windows las guarda solo en el registro.
+func TestEscalateDesyncHiveOnlyMicrosoftIsInfo(t *testing.T) {
+	reales := []string{
+		`Microsoft\OneCore\DirectX\DirectXDatabaseUpdater`,
+		`Microsoft\Windows\Application Experience\AitAgent`,
+		`Microsoft\Windows\Customer Experience Improvement Program\KernelCeipTask`,
+		`Microsoft\Windows\input\InputSettingsRestoreDataAvailable`,
+	}
+	for _, rel := range reales {
+		a := art("scheduled_task_desync", rel, map[string]string{"Kind": "hive_only", "RelPath": rel})
+		got := escalate(a, ruleFor("scheduled_task_desync"))
+		if got.Severity != SevInfo {
+			t.Errorf("%s: got %s, want INFO", rel, got.Severity)
+		}
+	}
+}
+
+// TestEscalateDesyncHiveOnlyOutsideMicrosoftStaysHigh protege la detección
+// real: una tarea de tercero que desapareció del disco sigue siendo señal.
+func TestEscalateDesyncHiveOnlyOutsideMicrosoftStaysHigh(t *testing.T) {
+	a := art("scheduled_task_desync", "MiTareaRara",
+		map[string]string{"Kind": "hive_only", "RelPath": "MiTareaRara"})
+	got := escalate(a, ruleFor("scheduled_task_desync"))
+	if got.Severity != SevHigh {
+		t.Fatalf("got %s, want HIGH", got.Severity)
+	}
+}
+
 func TestEscalateDesyncFileOnly(t *testing.T) {
 	a := art("scheduled_task_desync", "Updater", map[string]string{"Kind": "file_only"})
 	got := escalate(a, ruleFor("scheduled_task_desync"))
