@@ -147,6 +147,7 @@ func runGUI(timeout time.Duration, outPath string, elevated bool) error {
 				Version: agentVersion,
 				Machine: machineInfo(elevated),
 				Observer: collector.Observer{
+					OnProgress: newProgressEmitter(emit),
 					OnStart: func(i, total int, name string) {
 						emit(ui.Event{
 							Kind:  ui.KindCollectorStart,
@@ -179,6 +180,35 @@ func runGUI(timeout time.Duration, outPath string, elevated bool) error {
 			emit(ui.Event{Kind: ui.KindScanDone, Report: &rep})
 		},
 	})
+}
+
+// newProgressEmitter arma el callback de avance interno, acotando la
+// frecuencia a un evento por cada punto porcentual.
+//
+// El escaneo de la MFT informa por cada bloque leído —miles de veces en un
+// disco normal— y cada evento cuesta un marshal, un Dispatch y un Eval. Sin
+// este freno la interfaz se pasaría el escaneo repintando en vez de mostrando.
+// Con él son 100 eventos por colector como máximo, que es de sobra para que la
+// barra se vea fluida.
+func newProgressEmitter(emit func(ui.Event)) func(int, int, string, int64, int64) {
+	lastPct := -1
+	return func(index, total int, name string, done, unitTotal int64) {
+		if unitTotal <= 0 {
+			return
+		}
+		pct := int(done * 100 / unitTotal)
+		if pct == lastPct {
+			return
+		}
+		lastPct = pct
+		emit(ui.Event{
+			Kind:      ui.KindCollectorProgress,
+			Index:     index,
+			Total:     total,
+			Collector: name,
+			Fraction:  float64(done) / float64(unitTotal),
+		})
+	}
 }
 
 // maxLiveFindingsPerCollector acota cuántos hallazgos se empujan a la vista en

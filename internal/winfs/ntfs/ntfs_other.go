@@ -24,6 +24,6 @@ type DeletedEntry struct {
 }
 
 // ScanDeleted no está soportado fuera de Windows.
-func ScanDeleted(ctx context.Context, volume string) ([]DeletedEntry, error) {
+func ScanDeleted(ctx context.Context, volume string, onProgress func(done, total int64)) ([]DeletedEntry, error) {
 	return nil, ErrUnsupported
 }

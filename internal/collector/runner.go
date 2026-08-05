@@ -22,6 +22,10 @@ type Observer struct {
 	// OnFinish se invoca al terminar cada colector, con su resultado (que
 	// puede traer Err: un colector caído también se reporta).
 	OnFinish func(index, total int, res Result)
+	// OnProgress recibe el avance INTERNO de los colectores que lo informan.
+	// Sin esto la barra queda congelada durante los colectores largos, que
+	// son justamente los que más tardan.
+	OnProgress func(index, total int, name string, done, unitTotal int64)
 }
 
 // Run ejecuta los colectores ordenados por prioridad ascendente. Un panic
@@ -45,6 +49,16 @@ func RunObserved(ctx context.Context, collectors []Collector, obs Observer) []Re
 		index := i + 1
 		if obs.OnStart != nil {
 			obs.OnStart(index, total, c.Name())
+		}
+		// Los colectores que saben informar avance quedan conectados antes de
+		// arrancar; los demás simplemente no implementan la interfaz.
+		if obs.OnProgress != nil {
+			if rep, ok := c.(Reporter); ok {
+				name := c.Name()
+				rep.SetProgress(func(done, unitTotal int64) {
+					obs.OnProgress(index, total, name, done, unitTotal)
+				})
+			}
 		}
 		res := runOne(ctx, c)
 		if obs.OnFinish != nil {

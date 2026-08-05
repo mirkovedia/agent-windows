@@ -222,7 +222,23 @@ h1 { font-size: 21px; font-weight: 600; letter-spacing: -.2px; margin-bottom: 8p
   padding: 8px 10px; border-radius: 6px; margin-bottom: 3px;
   background: transparent; border: 1px solid transparent;
   transition: all .2s; font-size: 13px;
+  position: relative; overflow: hidden;
 }
+
+/* Barra de avance propia de cada fuente, al pie de su fila. Solo se llena en
+   las que informan progreso interno; en las rápidas salta de 0 a 100. */
+.c-track {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  height: 2px; background: rgba(255,255,255,.05);
+}
+.c-fill {
+  display: block; height: 100%; width: 0%;
+  background: var(--accent); opacity: .8;
+  transition: width .3s ease;
+}
+li.done .c-fill { background: var(--ok); }
+li.failed .c-fill { background: var(--sev-medium); }
+li.pending .c-track { opacity: 0; }
 .collector-list li.running {
   border-color: var(--accent); background: var(--accent-soft);
   position: relative; overflow: hidden;
@@ -478,7 +494,9 @@ li.failed .c-icon { color: var(--sev-medium); }
   height: 100%; width: 0%; position: relative; overflow: hidden;
   background: var(--accent);
   box-shadow: 0 0 12px rgba(242,128,31,.7);
-  transition: width .45s cubic-bezier(.22,.9,.3,1);
+  /* Corta: el avance ahora llega cada punto porcentual, así que una
+     transición larga se solaparía consigo misma y se vería a destiempo. */
+  transition: width .25s linear;
 }
 /* Franjas en movimiento: el relleno queda quieto entre colectores, y sin
    esto parecería trabado durante los segundos que tarda cada fuente. */

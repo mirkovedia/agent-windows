@@ -92,6 +92,54 @@ func TestRunObservedReportsFailureToObserver(t *testing.T) {
 	}
 }
 
+// reportingCollector implementa Reporter para probar el cableado del avance.
+type reportingCollector struct {
+	stubCollector
+	report func(done, total int64)
+}
+
+func (r *reportingCollector) SetProgress(fn func(done, total int64)) { r.report = fn }
+
+func (r *reportingCollector) Collect(ctx context.Context) ([]Artifact, error) {
+	if r.report != nil {
+		r.report(50, 100) // a mitad de camino
+	}
+	return []Artifact{{Type: r.name}}, nil
+}
+
+func TestRunObservedForwardsInternalProgress(t *testing.T) {
+	c := &reportingCollector{stubCollector: stubCollector{name: "lento", priority: PriorityDisk}}
+	var gotDone, gotTotal int64
+	var gotIndex, gotOf int
+	RunObserved(context.Background(), []Collector{c}, Observer{
+		OnProgress: func(index, total int, name string, done, unitTotal int64) {
+			gotIndex, gotOf, gotDone, gotTotal = index, total, done, unitTotal
+		},
+	})
+	if gotDone != 50 || gotTotal != 100 {
+		t.Fatalf("avance = %d/%d, want 50/100", gotDone, gotTotal)
+	}
+	if gotIndex != 1 || gotOf != 1 {
+		t.Fatalf("posicion = %d/%d, want 1/1", gotIndex, gotOf)
+	}
+}
+
+// TestRunObservedIgnoresNonReporters cubre a los 8 colectores que no
+// implementan la interfaz: deben correr igual, sin cablear nada.
+func TestRunObservedIgnoresNonReporters(t *testing.T) {
+	cols := []Collector{stubCollector{name: "simple", priority: PriorityDisk}}
+	called := false
+	res := RunObserved(context.Background(), cols, Observer{
+		OnProgress: func(int, int, string, int64, int64) { called = true },
+	})
+	if called {
+		t.Fatal("un colector que no implementa Reporter no debe emitir avance")
+	}
+	if len(res) != 1 {
+		t.Fatalf("esperaba 1 resultado, got %d", len(res))
+	}
+}
+
 func TestRunRecoversPanic(t *testing.T) {
 	cols := []Collector{stubCollector{name: "bad", priority: PriorityVolatile, panics: true}}
 	results := Run(context.Background(), cols)

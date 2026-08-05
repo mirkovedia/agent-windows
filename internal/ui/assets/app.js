@@ -80,6 +80,9 @@ window.onAgentEvent = function (ev) {
     case "collector_start":
       onCollectorStart(ev);
       break;
+    case "collector_progress":
+      onCollectorProgress(ev);
+      break;
     case "collector_done":
       onCollectorDone(ev);
       break;
@@ -103,7 +106,8 @@ function onCollectorStart(ev) {
   if (!li) {
     li = document.createElement("li");
     li.innerHTML =
-      '<span class="c-icon">◐</span><span class="c-name"></span><span class="c-meta"></span>';
+      '<span class="c-icon">◐</span><span class="c-name"></span>' +
+      '<span class="c-meta"></span><span class="c-track"><i class="c-fill"></i></span>';
     li.querySelector(".c-name").textContent = ev.collector;
     document.getElementById("collector-list").appendChild(li);
     state.collectors[ev.collector] = li;
@@ -111,6 +115,32 @@ function onCollectorStart(ev) {
   li.className = "running";
   li.querySelector(".c-icon").textContent = "◐";
   li.querySelector(".c-meta").textContent = "";
+  li.querySelector(".c-fill").style.width = "0%";
+
+  // La barra global arranca en lo ya completado y avanza dentro del tramo de
+  // este colector a medida que llega su avance interno.
+  setGlobalProgress(ev.index - 1, ev.total, 0);
+}
+
+// onCollectorProgress mueve la barra DENTRO del colector actual. Es lo que
+// evita que se vea congelada durante los 30-60 segundos que tarda la MFT.
+function onCollectorProgress(ev) {
+  var li = state.collectors[ev.collector];
+  if (li) {
+    var pct = Math.round((ev.fraction || 0) * 100);
+    li.querySelector(".c-fill").style.width = pct + "%";
+    li.querySelector(".c-meta").textContent = pct + "%";
+  }
+  setGlobalProgress(ev.index - 1, ev.total, ev.fraction || 0);
+}
+
+// setGlobalProgress compone el avance total: colectores terminados más la
+// fracción del que está corriendo.
+function setGlobalProgress(completed, total, fraction) {
+  if (!total) return;
+  var pct = ((completed + fraction) / total) * 100;
+  document.getElementById("progress-bar").style.width = pct + "%";
+  document.getElementById("progress-pct").textContent = Math.round(pct) + "%";
 }
 
 function onCollectorDone(ev) {
@@ -128,10 +158,9 @@ function onCollectorDone(ev) {
     li.querySelector(".c-meta").textContent = n + (n === 1 ? " artefacto" : " artefactos");
     state.totalArtifacts += n;
   }
+  li.querySelector(".c-fill").style.width = "100%";
 
-  var pct = ev.total ? Math.round((ev.index / ev.total) * 100) : 0;
-  document.getElementById("progress-bar").style.width = pct + "%";
-  document.getElementById("progress-pct").textContent = pct + "%";
+  setGlobalProgress(ev.index, ev.total, 0);
   countUp(document.getElementById("progress-artifacts-n"), state.totalArtifacts);
 }
 
