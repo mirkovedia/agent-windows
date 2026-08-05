@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(go get *)",
-      "Bash(go doc *)"
+      "Bash(go doc *)",
+      "Bash(gofmt -w internal/collector/shimcache/parse.go)"
     ]
   }
 }

@@ -19,9 +19,13 @@ type Entry struct {
 
 var win10Magic = []byte("10ts")
 
-// win10HeaderSize es el tamaño fijo del header AppCompatCache en Win10/11.
-// Las entradas "10ts" empiezan siempre en este offset.
-const win10HeaderSize = 0x30
+// Offsets de header conocidos del AppCompatCache. El primer DWORD del blob es
+// el offset donde arrancan las entradas, y cada versión de Windows usa el
+// suyo: 0x30 en Win10 RTM–1511, 0x34 desde 1607 en adelante (incluido Win11).
+const (
+	headerWin10RTM   = 0x30
+	headerWin10_1607 = 0x34
+)
 
 // parseAppCompatCache parsea el blob binario del valor AppCompatCache.
 // Implementa el formato Win10/Win11 (entradas "10ts").
@@ -29,18 +33,21 @@ func parseAppCompatCache(blob []byte) ([]Entry, error) {
 	if len(blob) < 4 {
 		return nil, fmt.Errorf("blob AppCompatCache vacío o truncado")
 	}
-	// Los primeros 4 bytes son la firma de versión: 0x30 (Win10 RTM) o
-	// 0x34 (Win10 1607+). No es un offset: las entradas siguen a un header
-	// de tamaño fijo 0x30.
-	signature := binary.LittleEndian.Uint32(blob[0:4])
-	if signature != 0x30 && signature != 0x34 {
-		return nil, fmt.Errorf("firma AppCompatCache no soportada: 0x%x", signature)
+	// El primer DWORD es el offset a la primera entrada, no una firma opaca.
+	// Se lo usa como offset en vez de asumir un tamaño fijo: con la constante
+	// hardcodeada, un blob de Win10 1607+ (0x34) empezaba a leerse 4 bytes
+	// antes, el magic "10ts" no matcheaba y no se parseaba ni una entrada.
+	headerSize := int(binary.LittleEndian.Uint32(blob[0:4]))
+	if headerSize != headerWin10RTM && headerSize != headerWin10_1607 {
+		return nil, fmt.Errorf(
+			"offset de header AppCompatCache no soportado: 0x%x (blob de %d bytes, primeros bytes: % x)",
+			headerSize, len(blob), blob[:min(16, len(blob))])
 	}
-	if len(blob) < win10HeaderSize {
+	if len(blob) < headerSize {
 		return nil, fmt.Errorf("blob más corto que el header: %d bytes", len(blob))
 	}
 	var entries []Entry
-	pos := win10HeaderSize
+	pos := headerSize
 	for pos+12 <= len(blob) {
 		if !bytes.Equal(blob[pos:pos+4], win10Magic) {
 			break
@@ -77,4 +84,3 @@ func parseWin10Record(rec []byte) (Entry, error) {
 	ft := binary.LittleEndian.Uint64(rec[2+pathLen : 2+pathLen+8])
 	return Entry{Path: path, ModifiedTime: wintime.FiletimeToTime(ft)}, nil
 }
-

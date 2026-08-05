@@ -2,26 +2,47 @@ package shimcache
 
 import (
 	"encoding/binary"
+	"strings"
 	"testing"
 )
 
-func TestParseAppCompatCacheWin10Signature(t *testing.T) {
-	// Header Win10: offset 0x30 al primer registro; magic "10ts" en cada entrada.
-	blob := make([]byte, 0x30)
-	binary.LittleEndian.PutUint32(blob[0:4], 0x34) // offset de header Win10
+// TestParseAppCompatCacheHeaderSizes cubre las dos versiones del header. El
+// primer DWORD es el offset donde arrancan las entradas, así que el blob debe
+// construirse con esa misma cantidad de bytes de cabecera: 0x30 en Win10
+// RTM–1511 y 0x34 desde 1607 en adelante, que es lo que corre en Win11.
+func TestParseAppCompatCacheHeaderSizes(t *testing.T) {
+	for _, headerSize := range []int{0x30, 0x34} {
+		blob := make([]byte, headerSize)
+		binary.LittleEndian.PutUint32(blob[0:4], uint32(headerSize))
+		blob = append(blob, buildWin10Entry(`C:\Windows\System32\evil.exe`, 0x01D9B1DED53E8000)...)
 
-	entry := buildWin10Entry("C:\\Windows\\System32\\evil.exe", 0x01D9B1DED53E8000)
-	blob = append(blob, entry...)
+		entries, err := parseAppCompatCache(blob)
+		if err != nil {
+			t.Errorf("header 0x%x: %v", headerSize, err)
+			continue
+		}
+		if len(entries) != 1 {
+			t.Errorf("header 0x%x: len(entries) = %d, want 1", headerSize, len(entries))
+			continue
+		}
+		if entries[0].Path != `C:\Windows\System32\evil.exe` {
+			t.Errorf("header 0x%x: path = %q", headerSize, entries[0].Path)
+		}
+	}
+}
 
-	entries, err := parseAppCompatCache(blob)
-	if err != nil {
-		t.Fatalf("parseAppCompatCache error: %v", err)
+// TestParseAppCompatCacheRejectsUnknownHeader deja constancia de que un header
+// desconocido se rechaza con contexto suficiente para diagnosticarlo, en vez
+// de devolver entradas basura.
+func TestParseAppCompatCacheRejectsUnknownHeader(t *testing.T) {
+	blob := make([]byte, 0x40)
+	binary.LittleEndian.PutUint32(blob[0:4], 0x126264) // la celda "db" cruda
+	_, err := parseAppCompatCache(blob)
+	if err == nil {
+		t.Fatal("esperaba error con un header desconocido")
 	}
-	if len(entries) != 1 {
-		t.Fatalf("len(entries) = %d, want 1", len(entries))
-	}
-	if entries[0].Path != "C:\\Windows\\System32\\evil.exe" {
-		t.Fatalf("path = %q", entries[0].Path)
+	if !strings.Contains(err.Error(), "0x126264") {
+		t.Fatalf("el error debe incluir el valor leído: %v", err)
 	}
 }
 
