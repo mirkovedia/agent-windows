@@ -50,7 +50,12 @@ type pendingEntry struct {
 
 // ScanDeleted abre el volumen en crudo, ubica el $MFT vía boot sector + data runs,
 // barre todos los registros y recupera los borrados (InUse=0) que son forenses.
-func ScanDeleted(ctx context.Context, volume string) ([]DeletedEntry, error) {
+// ScanDeleted recorre la MFT del volumen buscando entradas borradas.
+//
+// onProgress, si no es nil, recibe el avance en bytes de MFT leídos sobre el
+// total. Recorrer la MFT entera lleva decenas de segundos: sin este aviso la
+// interfaz no tiene forma de mostrar que algo está pasando.
+func ScanDeleted(ctx context.Context, volume string, onProgress func(done, total int64)) ([]DeletedEntry, error) {
 	pathPtr, err := windows.UTF16PtrFromString(volume)
 	if err != nil {
 		return nil, fmt.Errorf("path de volumen inválido %q: %w", volume, err)
@@ -141,8 +146,17 @@ func ScanDeleted(ctx context.Context, volume string) ([]DeletedEntry, error) {
 	finish := func() []DeletedEntry {
 		out := make([]DeletedEntry, 0, len(pending))
 		for _, p := range pending {
+			full := ntfspath.ResolvePath(parentMap, p.parentRef, p.fileName)
+			// Windows Update borra y reemplaza miles de archivos del almacén
+			// de componentes en cada actualización. El nombre suelto no los
+			// delata ("oobeldr.exe", "ci.dll"): el token de Microsoft vive en
+			// el directorio, así que este filtro solo puede aplicarse acá,
+			// con la ruta ya reconstruida.
+			if fsforensic.IsSystemComponent(full) {
+				continue
+			}
 			out = append(out, DeletedEntry{
-				FullPath: ntfspath.ResolvePath(parentMap, p.parentRef, p.fileName),
+				FullPath: full,
 				FileName: p.fileName,
 				SI:       p.si,
 				FN:       p.fn,
@@ -152,6 +166,13 @@ func ScanDeleted(ctx context.Context, volume string) ([]DeletedEntry, error) {
 		}
 		return out
 	}
+
+	// Total a recorrer, para poder informar avance como fracción.
+	var mftTotal int64
+	for _, ext := range extents {
+		mftTotal += int64(ext.Length) * int64(boot.ClusterSize)
+	}
+	var mftDone int64
 
 scan:
 	for _, ext := range extents {
@@ -171,6 +192,10 @@ scan:
 				return finish(), fmt.Errorf("leer MFT en offset %d: %w", diskOff+pos, err)
 			}
 			pos += toRead
+			mftDone += toRead
+			if onProgress != nil {
+				onProgress(mftDone, mftTotal)
+			}
 
 			// Combinar el sobrante del bloque anterior con lo recién leído.
 			var data []byte

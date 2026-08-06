@@ -20,7 +20,7 @@ jobs:
           CGO_ENABLED: '0'
           GOOS: windows
           GOARCH: amd64
-        run: go build -trimpath -o mirkkkov.exe ./cmd/agent
+        run: go build -trimpath -ldflags="-H windowsgui" -o mirkkkov.exe ./cmd/agent
       - uses: actions/upload-artifact@v4
         with:
           name: mirkkkov-windows-amd64

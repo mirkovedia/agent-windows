@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Mirkkkov</title>
+<!--INLINE_CSS-->
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="dot" id="brand-dot"></span>
+    <span class="brand-name">Mirkkkov</span>
+    <span class="brand-sub">Verificación forense</span>
+  </div>
+  <div class="topbar-right">
+    <!-- Ecualizador: la señal de que el instrumento está trabajando. -->
+    <span class="wave" id="wave" hidden>
+      <i></i><i></i><i></i><i></i><i></i>
+    </span>
+    <span id="topbar-status"></span>
+  </div>
+</header>
+
+<main>
+
+  <!-- ============ 1. CONSENTIMIENTO ============ -->
+  <section id="screen-consent" class="screen active">
+    <div class="card">
+      <h1>Antes de empezar</h1>
+      <p class="lead">
+        Esta revisión analiza rastros que tu propia computadora ya guarda sobre
+        qué programas se ejecutaron y qué archivos se borraron.
+      </p>
+
+      <div class="cols">
+        <div class="col col-yes">
+          <h2>Qué se revisa</h2>
+          <ul>
+            <li>Nombres, hashes y fechas de programas ejecutados</li>
+            <li>Rastros de borrado de archivos</li>
+            <li>Servicios y tareas programadas del sistema</li>
+            <li>Registros de eventos de Windows</li>
+          </ul>
+        </div>
+        <div class="col col-no">
+          <h2>Qué NO se toca</h2>
+          <ul>
+            <li>Documentos, fotos y videos</li>
+            <li>Mensajes y conversaciones</li>
+            <li>Contraseñas y cookies</li>
+            <li>Historial de navegación</li>
+          </ul>
+        </div>
+      </div>
+
+      <p class="fineprint">
+        Solo se leen <strong>metadatos</strong>, nunca el contenido de tus archivos.
+        Los identificadores de hardware se anonimizan. El reporte queda guardado
+        en tu equipo y podés leerlo entero.
+      </p>
+
+      <div class="actions">
+        <button class="btn btn-ghost" onclick="rejectConsent()">Rechazar</button>
+        <button class="btn btn-primary" onclick="acceptConsent()">Acepto, iniciar revisión</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2. ESCANEO ============ -->
+  <section id="screen-scan" class="screen screen-wide">
+    <div class="scan-grid">
+
+      <!-- columna izquierda: fuentes -->
+      <aside class="scan-side">
+        <h2 class="side-title">Fuentes</h2>
+        <ul class="collector-list" id="collector-list"></ul>
+      </aside>
+
+      <!-- columna derecha: hallazgos en vivo -->
+      <div class="scan-main" id="scan-main">
+        <!-- Barrido: señala que el panel sigue leyendo aunque no aparezca
+             nada nuevo durante varios segundos. -->
+        <div class="sweep" id="sweep"></div>
+        <div class="live-header">
+          <h2 class="side-title">Detecciones</h2>
+          <div class="live-counters" id="live-counters"></div>
+        </div>
+        <div class="live-feed" id="live-feed">
+          <div class="live-empty" id="live-empty">
+            Todavía no se detectó nada relevante.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============ 3. RESULTADOS ============ -->
+  <section id="screen-results" class="screen">
+    <div class="verdict" id="verdict">
+      <div class="verdict-head">
+        <span class="verdict-label">Resultado</span>
+        <span class="verdict-level" id="verdict-level">—</span>
+      </div>
+      <div class="verdict-summary" id="verdict-summary"></div>
+
+      <!-- Distribución real de la evidencia. Un CRITICAL entre 300 hallazgos
+           se ve como lo que es, no como el titular. -->
+      <div class="dist">
+        <div class="dist-bar" id="dist-bar"></div>
+        <div class="dist-legend" id="dist-legend"></div>
+      </div>
+
+      <div class="verdict-note" id="verdict-note" hidden></div>
+    </div>
+
+    <div class="findings" id="findings"></div>
+
+    <div class="results-footer">
+      <span class="report-path" id="report-path"></span>
+      <button class="btn btn-ghost" onclick="closeApp()">Cerrar</button>
+    </div>
+  </section>
+
+</main>
+
+<!-- Barra de progreso fija al pie. Solo visible durante el escaneo. -->
+<footer class="statusbar" id="statusbar">
+  <div class="statusbar-track">
+    <div class="statusbar-fill" id="progress-bar"></div>
+  </div>
+  <div class="statusbar-info">
+    <span class="statusbar-current" id="progress-current">Preparando…</span>
+    <span class="statusbar-right">
+      <span><span id="progress-artifacts-n" data-v="0">0</span> artefactos</span>
+      <span class="statusbar-sep">·</span>
+      <span id="progress-count">0 / 0</span>
+      <span class="statusbar-pct" id="progress-pct">0%</span>
+    </span>
+  </div>
+</footer>
+
+<!--INLINE_JS-->
+</body>
+</html>

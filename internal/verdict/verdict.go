@@ -16,6 +16,14 @@ func Evaluate(results []collector.Result) ([]report.Finding, report.Verdict) {
 	var failed []string
 	var summaries []report.Finding
 
+	// seen mapea (tipo de artefacto, Source) al índice en items del primer
+	// hallazgo de ese objeto; dupCount cuenta cuántas veces se lo vio. El USN
+	// registra cada modificación, así que un mismo archivo aparece N veces y
+	// sin esto genera N hallazgos idénticos.
+	type dedupKey struct{ artType, source string }
+	seen := make(map[dedupKey]int)
+	dupCount := make(map[dedupKey]int)
+
 	for _, res := range results {
 		if res.Err != nil {
 			failed = append(failed, res.Collector)
@@ -47,7 +55,13 @@ func Evaluate(results []collector.Result) ([]report.Finding, report.Verdict) {
 				}
 				neutralEmitted++
 			}
+			key := dedupKey{artType: a.Type, source: a.Source}
+			dupCount[key]++
+			if _, dup := seen[key]; dup {
+				continue // ya se emitió un hallazgo para este objeto
+			}
 			at, hasTime := timeOf(a)
+			seen[key] = len(items)
 			items = append(items, evaluated{
 				finding: report.Finding{
 					ID:         fmt.Sprintf("%s-%d", res.Collector, i),
@@ -65,6 +79,14 @@ func Evaluate(results []collector.Result) ([]report.Finding, report.Verdict) {
 		}
 		if neutralTotal > 0 {
 			summaries = append(summaries, summaryFinding(res.Collector, neutralTotal, neutralEmitted))
+		}
+	}
+
+	// Anotar cuántos eventos respaldan cada hallazgo colapsado.
+	for key, idx := range seen {
+		if n := dupCount[key]; n > 1 {
+			items[idx].finding.Evidence = fmt.Sprintf("%d eventos sobre este artefacto. %s",
+				n, items[idx].finding.Evidence)
 		}
 	}
 
@@ -87,7 +109,10 @@ func titleFor(artifactType string) string {
 	case "mft_timestomp":
 		return "Timestamps manipulados (timestomping)"
 	case "eventlog.tamper_signal":
-		return "Archivo de log alterado a nivel binario"
+		// Neutro a propósito: el mismo tipo cubre desde un CRC roto (edición
+		// binaria real) hasta un log que no se pudo abrir. Afirmar "alterado"
+		// en ambos casos sería mentir en el segundo.
+		return "Anomalía estructural en archivo de log"
 	case "eventlog.desync":
 		return "Los eventos no coinciden con el estado del sistema"
 	case "scheduled_task_desync":
@@ -98,6 +123,8 @@ func titleFor(artifactType string) string {
 		return "Tarea programada oculta o sospechosa"
 	case "deleted_entry":
 		return "Archivo borrado recuperado del MFT"
+	case "scheduled_task_scan_incomplete":
+		return "Enumeración de tareas incompleta (directorios sin permiso)"
 	}
 	return "Artefacto " + artifactType
 }

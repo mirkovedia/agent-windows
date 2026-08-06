@@ -55,6 +55,50 @@ func (b *Builder) AddValue(name string, data []byte, regType uint32) uint32 {
 	return b.addCell(vk)
 }
 
+// MaxSegmentData es cuántos bytes de datos entran en un segmento de big data.
+// Un valor más grande que esto no cabe en una sola celda y Windows lo parte.
+const MaxSegmentData = 16344
+
+// AddBigValue agrega un valor cuyos datos se guardan segmentados detrás de una
+// celda "db", que es como Windows almacena los valores grandes (AppCompatCache
+// ronda los cientos de KB). Permite testear el camino que un valor chico nunca
+// ejercita.
+func (b *Builder) AddBigValue(name string, data []byte, regType uint32) uint32 {
+	// Un segmento por cada bloque de datos.
+	var segOffsets []uint32
+	for i := 0; i < len(data); i += MaxSegmentData {
+		end := i + MaxSegmentData
+		if end > len(data) {
+			end = len(data)
+		}
+		segOffsets = append(segOffsets, b.addCell(data[i:end]))
+	}
+
+	// La lista de segmentos es un arreglo de offsets.
+	list := make([]byte, len(segOffsets)*4)
+	for i, off := range segOffsets {
+		binary.LittleEndian.PutUint32(list[i*4:i*4+4], off)
+	}
+	listOffset := b.addCell(list)
+
+	// Celda db: firma + cantidad de segmentos + offset a la lista.
+	db := make([]byte, 8)
+	copy(db[0:2], "db")
+	binary.LittleEndian.PutUint16(db[2:4], uint16(len(segOffsets)))
+	binary.LittleEndian.PutUint32(db[4:8], listOffset)
+	dbOffset := b.addCell(db)
+
+	vk := make([]byte, 20+len(name))
+	copy(vk[0:2], "vk")
+	binary.LittleEndian.PutUint16(vk[2:4], uint16(len(name)))
+	// Sin bandera inline: el largo real de los datos, no del descriptor.
+	binary.LittleEndian.PutUint32(vk[4:8], uint32(len(data)))
+	binary.LittleEndian.PutUint32(vk[8:12], dbOffset)
+	binary.LittleEndian.PutUint32(vk[12:16], regType)
+	copy(vk[20:], name)
+	return b.addCell(vk)
+}
+
 // AddKey agrega una celda nk con el nombre dado, offsets de subclaves (otras
 // celdas nk, obtenidas de llamadas previas a AddKey) y offsets de valores
 // (celdas vk, de AddValue), y devuelve su offset. Debe llamarse de abajo

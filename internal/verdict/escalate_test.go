@@ -33,6 +33,49 @@ func TestEscalateNeutralSuspiciousBecomesMedium(t *testing.T) {
 	}
 }
 
+// TestEscalateWeakMarkerCapsAtMedium usa run-hook.cmd, el CRITICAL de la
+// segunda ejecución real. Es un script de desarrollo: el token "hook" es
+// evidencia débil y no puede llevar un archivo borrado hasta HIGH.
+func TestEscalateWeakMarkerCapsAtMedium(t *testing.T) {
+	a := art("deleted_entry", `C:\proyecto\run-hook.cmd`, nil)
+	got := escalate(a, ruleFor("deleted_entry"))
+	if got.Severity != SevMedium {
+		t.Fatalf("un marcador débil topa en MEDIUM, got %s", got.Severity)
+	}
+}
+
+func TestEscalateStrongMarkerStillReachesHigh(t *testing.T) {
+	a := art("deleted_entry", `C:\Temp\aimbot_loader.exe`, nil)
+	got := escalate(a, ruleFor("deleted_entry"))
+	if got.Severity != SevHigh {
+		t.Fatalf("un marcador fuerte sí llega a HIGH, got %s", got.Severity)
+	}
+}
+
+func TestEscalateTamperKindsThatAreNotEvidence(t *testing.T) {
+	// Ninguno de estos prueba manipulación: log_unreadable es un log que no
+	// existe (TaskScheduler/Operational viene deshabilitado en Windows) y
+	// dirty_flag es lo normal en un snapshot de un log vivo.
+	for _, kind := range []string{"log_unreadable", "dirty_flag", "full_flag"} {
+		a := art("eventlog.tamper_signal", kind, map[string]string{"Kind": kind})
+		got := escalate(a, ruleFor("eventlog.tamper_signal"))
+		if got.Severity != SevInfo {
+			t.Errorf("%s debe ser INFO, got %s", kind, got.Severity)
+		}
+	}
+}
+
+func TestEscalateTamperKindsThatAreEvidence(t *testing.T) {
+	// Estos sí son manipulación binaria del archivo.
+	for _, kind := range []string{"chunk_crc_invalid", "record_id_gap", "truncated"} {
+		a := art("eventlog.tamper_signal", kind, map[string]string{"Kind": kind})
+		got := escalate(a, ruleFor("eventlog.tamper_signal"))
+		if got.Severity != SevHigh {
+			t.Errorf("%s debe seguir en HIGH, got %s", kind, got.Severity)
+		}
+	}
+}
+
 func TestEscalateCapsAtHigh(t *testing.T) {
 	// service_driver base es MEDIUM; +2 saturaría en CRITICAL, pero el
 	// escalado por contenido tiene tope HIGH (CRITICAL es solo de combos).
@@ -63,11 +106,109 @@ func TestEscalateDesyncHiveOnly(t *testing.T) {
 	}
 }
 
+// TestEscalateDesyncHiveOnlyMicrosoftIsInfo usa las tareas exactas que la
+// tercera ejecución real reportó como HIGH. El diagnóstico de enumeración
+// salió en cero: el árbol se leyó completo y estas igual no tenían XML, o sea
+// que Windows las guarda solo en el registro.
+func TestEscalateDesyncHiveOnlyMicrosoftIsInfo(t *testing.T) {
+	reales := []string{
+		`Microsoft\OneCore\DirectX\DirectXDatabaseUpdater`,
+		`Microsoft\Windows\Application Experience\AitAgent`,
+		`Microsoft\Windows\Customer Experience Improvement Program\KernelCeipTask`,
+		`Microsoft\Windows\input\InputSettingsRestoreDataAvailable`,
+	}
+	for _, rel := range reales {
+		a := art("scheduled_task_desync", rel, map[string]string{"Kind": "hive_only", "RelPath": rel})
+		got := escalate(a, ruleFor("scheduled_task_desync"))
+		if got.Severity != SevInfo {
+			t.Errorf("%s: got %s, want INFO", rel, got.Severity)
+		}
+	}
+}
+
+// TestEscalateDesyncHiveOnlyOutsideMicrosoftStaysHigh protege la detección
+// real: una tarea de tercero que desapareció del disco sigue siendo señal.
+func TestEscalateDesyncHiveOnlyOutsideMicrosoftStaysHigh(t *testing.T) {
+	a := art("scheduled_task_desync", "MiTareaRara",
+		map[string]string{"Kind": "hive_only", "RelPath": "MiTareaRara"})
+	got := escalate(a, ruleFor("scheduled_task_desync"))
+	if got.Severity != SevHigh {
+		t.Fatalf("got %s, want HIGH", got.Severity)
+	}
+}
+
 func TestEscalateDesyncFileOnly(t *testing.T) {
 	a := art("scheduled_task_desync", "Updater", map[string]string{"Kind": "file_only"})
 	got := escalate(a, ruleFor("scheduled_task_desync"))
 	if got.Severity != SevLow {
 		t.Fatalf("file_only debe ser LOW, got %s", got.Severity)
+	}
+}
+
+func TestEscalateTaskNoRegisterLogIsInfo(t *testing.T) {
+	// Los Event Logs rotan: una tarea vieja nunca tiene su evento 106, así
+	// que la ausencia no prueba nada. Se reporta pero no mueve el veredicto.
+	a := art("eventlog.desync", "Updater", map[string]string{"Kind": "task_no_register_log"})
+	got := escalate(a, ruleFor("eventlog.desync"))
+	if got.Severity != SevInfo {
+		t.Fatalf("task_no_register_log debe ser INFO, got %s", got.Severity)
+	}
+}
+
+func TestEscalateOtherDesyncKindsStayMedium(t *testing.T) {
+	for _, kind := range []string{"service_no_install_log", "service_installed_then_removed", "task_delete_desync"} {
+		a := art("eventlog.desync", "X", map[string]string{"Kind": kind})
+		got := escalate(a, ruleFor("eventlog.desync"))
+		if got.Severity != SevMedium {
+			t.Errorf("%s debe seguir en MEDIUM, got %s", kind, got.Severity)
+		}
+	}
+}
+
+func TestEscalateMicrosoftHiddenTaskIsInfo(t *testing.T) {
+	a := art("scheduled_task", `Microsoft\Windows\UpdateOrchestrator\Reboot`,
+		map[string]any{"RelPath": `Microsoft\Windows\UpdateOrchestrator\Reboot`, "Hidden": true})
+	got := escalate(a, ruleFor("scheduled_task"))
+	if got.Severity != SevInfo {
+		t.Fatalf("una tarea oculta de Microsoft debe ser INFO, got %s", got.Severity)
+	}
+}
+
+func TestEscalateNonMicrosoftHiddenTaskStaysMedium(t *testing.T) {
+	a := art("scheduled_task", `MiTareaRara`,
+		map[string]any{"RelPath": `MiTareaRara`, "Hidden": true})
+	got := escalate(a, ruleFor("scheduled_task"))
+	if got.Severity != SevMedium {
+		t.Fatalf("una tarea oculta fuera de Microsoft sigue en MEDIUM, got %s", got.Severity)
+	}
+}
+
+func TestEscalateDriverInNormalLocationIsInfo(t *testing.T) {
+	normales := []string{
+		`C:\Program Files\Vendor\driver.sys`,
+		`C:\Program Files (x86)\Otro\x.sys`,
+		`C:\Windows\System32\DriverStore\FileRepository\algo\y.sys`,
+	}
+	for _, p := range normales {
+		a := art("service_driver", p, map[string]any{"ImagePath": p})
+		got := escalate(a, ruleFor("service_driver"))
+		if got.Severity != SevInfo {
+			t.Errorf("driver en %q debe ser INFO, got %s", p, got.Severity)
+		}
+	}
+}
+
+func TestEscalateDriverInSuspiciousLocationStaysMedium(t *testing.T) {
+	raros := []string{
+		`C:\Users\X\AppData\Local\Temp\evil.sys`,
+		`C:\Users\X\Downloads\d.sys`,
+	}
+	for _, p := range raros {
+		a := art("service_driver", p, map[string]any{"ImagePath": p})
+		got := escalate(a, ruleFor("service_driver"))
+		if got.Severity != SevMedium {
+			t.Errorf("driver en %q debe seguir en MEDIUM, got %s", p, got.Severity)
+		}
 	}
 }
 

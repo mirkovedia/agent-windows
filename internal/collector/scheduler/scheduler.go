@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/telagem/agent-windows/internal/collector"
@@ -31,8 +32,8 @@ func (c *Collector) Name() string  { return "scheduled_tasks" }
 func (c *Collector) Priority() int { return collector.PriorityDisk }
 
 func (c *Collector) Collect(ctx context.Context) ([]collector.Artifact, error) {
-	onDisk, walkErr := c.readTasksDir(ctx)
-	if walkErr != nil && len(onDisk) == 0 {
+	disk, walkErr := c.readTasksDir(ctx)
+	if walkErr != nil && len(disk.tasks) == 0 {
 		return nil, walkErr // no se pudo enumerar nada: falla dura
 	}
 
@@ -43,7 +44,13 @@ func (c *Collector) Collect(ctx context.Context) ([]collector.Artifact, error) {
 	// fallo transitorio de VSS en una sola de las dos fuentes es peor que
 	// degradar con gracia.
 	if cached, err := c.readTaskCache(); err == nil {
-		for _, d := range winscheduler.DiffTasks(onDisk, cached) {
+		for _, d := range winscheduler.DiffTasks(disk.tasks, cached) {
+			// Una tarea que el registro conoce pero que vive en un directorio
+			// que no pudimos listar NO es una tarea borrada: es una tarea que
+			// no llegamos a mirar. Afirmar lo contrario es inventar evidencia.
+			if d.Kind == winscheduler.HiveOnly && isUnderAny(d.RelPath, disk.unreadableDirs) {
+				continue
+			}
 			b, _ := json.Marshal(d)
 			artifacts = append(artifacts, collector.Artifact{
 				Type:      "scheduled_task_desync",
@@ -54,7 +61,22 @@ func (c *Collector) Collect(ctx context.Context) ([]collector.Artifact, error) {
 		}
 	}
 
-	for _, t := range onDisk {
+	// Dejar constancia de los huecos de enumeración: sin esto, un escaneo
+	// parcial se ve idéntico a uno completo.
+	if len(disk.unreadableDirs) > 0 {
+		b, _ := json.Marshal(map[string]any{
+			"Dirs":   len(disk.unreadableDirs),
+			"Sample": firstN(disk.unreadableDirs, 5),
+		})
+		artifacts = append(artifacts, collector.Artifact{
+			Type:      "scheduled_task_scan_incomplete",
+			Source:    c.TasksDir,
+			Data:      b,
+			Collected: time.Now(),
+		})
+	}
+
+	for _, t := range disk.tasks {
 		if !isReportable(t) {
 			continue
 		}
@@ -81,15 +103,31 @@ func isReportable(t winscheduler.TaskDefinition) bool {
 	return fsforensic.IsSuspiciousName(t.Command) || fsforensic.IsSuspiciousName(t.Arguments)
 }
 
+// diskScan es el resultado de enumerar el directorio de tareas: las tareas
+// encontradas y los subdirectorios que no se pudieron listar.
+type diskScan struct {
+	tasks []winscheduler.TaskDefinition
+	// unreadableDirs son rutas relativas cuyo contenido nunca se enumeró.
+	// De esas tareas no sabemos NADA: no se puede afirmar que fueron borradas.
+	unreadableDirs []string
+}
+
 // readTasksDir enumera recursivamente TasksDir y parsea cada archivo como
-// definición de tarea. Un archivo individual corrupto o inaccesible se
-// omite; solo un fallo en la raíz misma es un error real.
-func (c *Collector) readTasksDir(ctx context.Context) ([]winscheduler.TaskDefinition, error) {
-	var out []winscheduler.TaskDefinition
+// definición de tarea. Un archivo individual corrupto o inaccesible se registra
+// igual como presente; un directorio que no se puede listar se anota aparte.
+// Solo un fallo en la raíz misma es un error real.
+func (c *Collector) readTasksDir(ctx context.Context) (diskScan, error) {
+	var scan diskScan
 	err := filepath.WalkDir(c.TasksDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if path == c.TasksDir {
 				return err
+			}
+			// Windows protege con ACL varios de sus propios directorios de
+			// tareas. Sus hijos nunca se visitan, así que hay que recordar el
+			// hueco: sin esto el cross-check los reporta como borrados.
+			if rel, relErr := filepath.Rel(c.TasksDir, path); relErr == nil {
+				scan.unreadableDirs = append(scan.unreadableDirs, rel)
 			}
 			return nil
 		}
@@ -101,22 +139,50 @@ func (c *Collector) readTasksDir(ctx context.Context) ([]winscheduler.TaskDefini
 			return ctx.Err()
 		default:
 		}
-		raw, err := os.ReadFile(path)
-		if err != nil {
-			return nil
-		}
 		rel, err := filepath.Rel(c.TasksDir, path)
 		if err != nil {
 			return nil
 		}
+		// WalkDir ya probó que el archivo EXISTE. Si después no se puede leer
+		// o parsear (Windows pone ACLs restrictivas en varias de sus propias
+		// tareas), igual se registra como presente en disco: descartarla haría
+		// que el cross-check contra TaskCache la reporte como borrada, que es
+		// afirmar algo que no sabemos. Queda sin Command/Hidden, así que el
+		// filtro de tareas reportables no la va a destacar.
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			scan.tasks = append(scan.tasks, winscheduler.TaskDefinition{RelPath: rel})
+			return nil
+		}
 		t, err := winscheduler.ParseTaskXML(raw, rel)
 		if err != nil {
-			return nil // XML corrupto o no-XML: se omite
+			scan.tasks = append(scan.tasks, winscheduler.TaskDefinition{RelPath: rel})
+			return nil
 		}
-		out = append(out, t)
+		scan.tasks = append(scan.tasks, t)
 		return nil
 	})
-	return out, err
+	return scan, err
+}
+
+// firstN devuelve hasta n elementos, para muestras de diagnóstico.
+func firstN(items []string, n int) []string {
+	if len(items) < n {
+		n = len(items)
+	}
+	return items[:n]
+}
+
+// isUnderAny reporta si relPath cae dentro de alguno de los directorios dados.
+func isUnderAny(relPath string, dirs []string) bool {
+	lower := strings.ToLower(relPath)
+	for _, d := range dirs {
+		ld := strings.ToLower(d)
+		if lower == ld || strings.HasPrefix(lower, ld+`\`) {
+			return true
+		}
+	}
+	return false
 }
 
 // readTaskCache abre el hive SOFTWARE y camina TaskCache\Tree.

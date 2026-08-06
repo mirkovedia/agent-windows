@@ -1,0 +1,533 @@
+/* ============================================================
+   Mirkkkov — instrumento de verificación
+
+   La dirección visual es "instrumento de medición", no "panel de
+   seguridad". Dos personas miran esta pantalla al mismo tiempo: quien
+   revisa y quien es revisado. Una interfaz que grita predispone a acusar,
+   y el motor de veredicto fue construido justamente para no afirmar de
+   más. La calma acá es una decisión, no falta de carácter.
+
+   Ámbar en vez de rojo como color de marca: es el color del instrumental
+   (fósforo ámbar, señalética de medición), no el de la alarma.
+   ============================================================ */
+
+:root {
+  /* Grafito con temperatura, no negro puro. */
+  --bg: #0d0f14;
+  --bg-elev: #151821;
+  --bg-soft: #1c202a;
+  --bg-hi: #232833;
+
+  --border: #262b38;
+  --border-soft: #1e232e;
+
+  --text: #e8eaf0;
+  --text-dim: #8b94a6;
+  --text-faint: #5c6577;
+
+  /* Ámbar de instrumento. */
+  --accent: #f2801f;
+  --accent-soft: rgba(242, 128, 31, 0.14);
+
+  /* Escala de severidad: de reposo a alarma. */
+  --sev-info: #5c6577;
+  --sev-low: #4d80c4;
+  --sev-medium: #d9a441;
+  --sev-high: #e07a3c;
+  --sev-critical: #d64545;
+  --ok: #4aa06b;
+
+  --mono: "Cascadia Mono", Consolas, "Courier New", monospace;
+  --sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  /* La retícula tenue evoca papel milimetrado: mide, no decora. Se
+     mantiene al borde de lo perceptible a propósito. */
+  background:
+    linear-gradient(180deg, #10131a 0%, var(--bg) 340px),
+    repeating-linear-gradient(0deg, transparent 0 39px, rgba(255,255,255,.016) 39px 40px),
+    repeating-linear-gradient(90deg, transparent 0 39px, rgba(255,255,255,.016) 39px 40px);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+::selection { background: var(--accent-soft); }
+
+/* Foco visible: alguien puede recorrer esto sin mouse. */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+
+/* ---------------- cabecera ---------------- */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 13px 22px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(13, 15, 20, .82);
+  backdrop-filter: blur(8px);
+  flex-shrink: 0;
+}
+.brand { display: flex; align-items: baseline; gap: 10px; }
+.dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
+  align-self: center;
+}
+.brand-name {
+  font-weight: 600; letter-spacing: .3px; font-size: 14.5px;
+}
+.brand-sub {
+  color: var(--text-faint); font-size: 11px;
+  font-family: var(--mono); letter-spacing: .4px;
+}
+.topbar-right {
+  display: flex; align-items: center; gap: 12px;
+  color: var(--text-dim); font-size: 11px;
+  font-family: var(--mono); letter-spacing: .6px; text-transform: uppercase;
+}
+
+/* Ecualizador de actividad. Cinco barras con fases distintas: irregular a
+   propósito, porque una animación perfectamente sincronizada se lee como
+   adorno y no como señal. */
+.wave { display: flex; align-items: flex-end; gap: 2px; height: 13px; }
+.wave i {
+  width: 2px; background: var(--accent); border-radius: 1px;
+  animation: eq .9s ease-in-out infinite;
+}
+.wave i:nth-child(1) { height: 40%; animation-delay: 0s; }
+.wave i:nth-child(2) { height: 75%; animation-delay: .18s; }
+.wave i:nth-child(3) { height: 100%; animation-delay: .34s; }
+.wave i:nth-child(4) { height: 60%; animation-delay: .12s; }
+.wave i:nth-child(5) { height: 85%; animation-delay: .45s; }
+@keyframes eq {
+  0%, 100% { transform: scaleY(.35); opacity: .55; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+
+/* Anillo expansivo sobre el punto de marca mientras escanea. */
+.dot.live::after {
+  content: ""; position: absolute; inset: -4px;
+  border-radius: 50%; border: 1px solid var(--accent);
+  animation: ring 1.8s ease-out infinite;
+}
+.dot { position: relative; }
+@keyframes ring {
+  0% { transform: scale(.6); opacity: .9; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+main { flex: 1; overflow-y: auto; padding: 26px 22px 30px; }
+
+/* ---------------- pantallas ---------------- */
+.screen { display: none; max-width: 880px; margin: 0 auto; }
+.screen.active { display: block; animation: rise .3s ease; }
+.screen-wide { max-width: 1240px; }
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.card {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 30px;
+}
+
+h1 { font-size: 21px; font-weight: 600; letter-spacing: -.2px; margin-bottom: 8px; }
+.lead { color: var(--text-dim); line-height: 1.65; margin-bottom: 24px; }
+
+/* Etiqueta de sección: monoespaciada, como rótulo de instrumento. */
+.side-title, h2 {
+  font-family: var(--mono);
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: 1.2px;
+  color: var(--text-faint); font-weight: 600;
+  margin-bottom: 12px;
+}
+
+/* ---------------- consentimiento ---------------- */
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+.col {
+  background: var(--bg-soft); border-radius: 8px; padding: 17px;
+  border: 1px solid var(--border-soft);
+}
+.col-yes h2 { color: var(--ok); }
+.col-no h2 { color: var(--sev-critical); }
+.col ul { list-style: none; }
+.col li {
+  padding: 5px 0 5px 19px; position: relative;
+  color: var(--text-dim); line-height: 1.45; font-size: 13.5px;
+}
+.col-yes li::before { content: "+"; position: absolute; left: 0; color: var(--ok); font-family: var(--mono); }
+.col-no li::before { content: "\2212"; position: absolute; left: 0; color: var(--sev-critical); font-family: var(--mono); }
+
+.fineprint {
+  color: var(--text-dim); font-size: 12.5px; line-height: 1.65;
+  padding: 15px; background: var(--bg-soft); border-radius: 8px;
+  border-left: 2px solid var(--accent); margin-bottom: 24px;
+}
+.fineprint strong { color: var(--text); font-weight: 600; }
+
+.actions { display: flex; gap: 10px; justify-content: flex-end; }
+.btn {
+  padding: 10px 20px; border-radius: 7px; border: 1px solid var(--border);
+  font-size: 13.5px; font-family: inherit; cursor: pointer;
+  transition: all .16s; background: var(--bg-soft); color: var(--text);
+}
+.btn:hover { border-color: var(--text-faint); background: var(--bg-hi); }
+.btn-primary {
+  background: var(--accent); border-color: var(--accent);
+  color: #16110a; font-weight: 600;
+}
+.btn-primary:hover { filter: brightness(1.08); border-color: var(--accent); }
+
+/* ---------------- escaneo ---------------- */
+.scan-grid { display: grid; grid-template-columns: 280px 1fr; gap: 14px; }
+.scan-side, .scan-main {
+  background: var(--bg-elev); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px;
+}
+.scan-main { position: relative; overflow: hidden; }
+
+/* Barrido vertical continuo sobre el panel de detecciones. Es la señal de
+   que el instrumento sigue leyendo aunque pasen segundos sin resultados: un
+   panel quieto se lee como colgado. */
+.sweep {
+  position: absolute; left: 0; right: 0; top: 0; height: 120px;
+  pointer-events: none; opacity: 0; z-index: 1;
+  background: linear-gradient(180deg,
+    transparent, rgba(242,128,31,.055) 55%, rgba(242,128,31,.11) 78%, transparent);
+}
+.sweep.on { opacity: 1; animation: sweep 2.6s linear infinite; }
+@keyframes sweep {
+  0% { transform: translateY(-130px); }
+  100% { transform: translateY(calc(100vh - 200px)); }
+}
+
+.collector-list { list-style: none; }
+.collector-list li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 6px; margin-bottom: 3px;
+  background: transparent; border: 1px solid transparent;
+  transition: all .2s; font-size: 13px;
+  position: relative; overflow: hidden;
+}
+
+/* Barra de avance propia de cada fuente, al pie de su fila. Solo se llena en
+   las que informan progreso interno; en las rápidas salta de 0 a 100. */
+.c-track {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  height: 2px; background: rgba(255,255,255,.05);
+}
+.c-fill {
+  display: block; height: 100%; width: 0%;
+  background: var(--accent); opacity: .8;
+  transition: width .3s ease;
+}
+li.done .c-fill { background: var(--ok); }
+li.failed .c-fill { background: var(--sev-medium); }
+li.pending .c-track { opacity: 0; }
+.collector-list li.running {
+  border-color: var(--accent); background: var(--accent-soft);
+  position: relative; overflow: hidden;
+}
+/* Destello que recorre la fuente que se está leyendo en este momento. */
+.collector-list li.running::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg,
+    transparent, rgba(242,128,31,.16), transparent);
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.collector-list li.done { background: var(--bg-soft); }
+.collector-list li.failed { border-color: var(--sev-medium); background: rgba(217,164,65,.07); }
+.c-icon { width: 13px; text-align: center; flex-shrink: 0; font-family: var(--mono); font-size: 12px; }
+.c-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.c-meta { color: var(--text-faint); font-size: 11px; font-family: var(--mono); flex-shrink: 0; }
+li.pending .c-name, li.pending .c-icon { color: var(--text-faint); }
+li.running .c-icon { animation: spin 1.1s linear infinite; color: var(--accent); }
+li.done .c-icon { color: var(--ok); }
+li.failed .c-icon { color: var(--sev-medium); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.live-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.live-header .side-title { margin-bottom: 0; }
+.live-counters { display: flex; gap: 5px; }
+.counter {
+  font-family: var(--mono);
+  font-size: 10.5px; font-weight: 700; padding: 3px 8px;
+  border-radius: 4px; color: #fff; opacity: 0; transform: scale(.85);
+  transition: all .22s ease;
+}
+.counter.on { opacity: 1; transform: scale(1); }
+.counter.bump { animation: bump .3s ease; }
+@keyframes bump { 50% { transform: scale(1.22); } }
+
+.live-feed {
+  height: calc(100vh - 268px); overflow-y: auto;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.live-empty {
+  color: var(--text-faint); text-align: center; padding: 44px 0;
+  font-size: 13px; font-family: var(--mono);
+}
+
+.live-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 6px;
+  background: var(--bg-soft);
+  border-left: 2px solid var(--sev-info);
+  animation: slidein .34s cubic-bezier(.22,.9,.3,1);
+  flex-shrink: 0; position: relative; z-index: 2;
+}
+/* Entra corrido, apenas escalado y con la altura abriéndose: da la sensación
+   de que la lista lo empuja hacia adentro en vez de aparecer de la nada. */
+@keyframes slidein {
+  0% { opacity: 0; transform: translateX(-18px) scale(.97); max-height: 0; }
+  60% { opacity: 1; }
+  100% { opacity: 1; transform: none; max-height: 60px; }
+}
+
+/* Destello del color de la severidad al entrar: cuanto más grave, más se
+   nota. Un CRITICAL no debería poder pasar desapercibido. */
+.live-item::before {
+  content: ""; position: absolute; inset: 0; border-radius: 6px;
+  pointer-events: none; opacity: 0;
+  animation: flash .8s ease-out;
+}
+.live-item.lv-medium::before { background: var(--sev-medium); }
+.live-item.lv-high::before { background: var(--sev-high); }
+.live-item.lv-critical::before { background: var(--sev-critical); }
+@keyframes flash {
+  0% { opacity: .3; }
+  100% { opacity: 0; }
+}
+.live-item.lv-low { border-left-color: var(--sev-low); }
+.live-item.lv-medium { border-left-color: var(--sev-medium); }
+.live-item.lv-high { border-left-color: var(--sev-high); }
+.live-item.lv-critical { border-left-color: var(--sev-critical); background: rgba(214,69,69,.08); }
+.live-title { flex-shrink: 0; font-size: 13px; }
+.live-path {
+  flex: 1; color: var(--text-faint); font-size: 11.5px;
+  font-family: var(--mono);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  /* Recorta por el principio para dejar visible el nombre del archivo, que es
+     lo único que cambia entre rutas. unicode-bidi:plaintext es imprescindible:
+     con direction:rtl a secas, el algoritmo bidireccional reordena las barras
+     invertidas y las rutas se leen mal (aparece una "\" al final que no
+     existe en el dato). Con plaintext, el primer carácter fuerte decide la
+     dirección del texto y solo el recorte queda del lado izquierdo. */
+  direction: rtl; unicode-bidi: plaintext; text-align: left;
+}
+
+/* ---------------- veredicto: lectura de instrumento ---------------- */
+.verdict {
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--bg-elev); margin-bottom: 14px; overflow: hidden;
+  animation: verdictIn .5s cubic-bezier(.22,.9,.3,1);
+}
+@keyframes verdictIn {
+  from { opacity: 0; transform: translateY(-10px) scale(.99); }
+  to { opacity: 1; transform: none; }
+}
+/* El veredicto se revela letra a letra: el instrumento termina de imprimir
+   su lectura. Dura poco a propósito, no es un efecto de máquina de escribir. */
+.verdict-level { overflow: hidden; white-space: nowrap; }
+.verdict-level.reveal-type {
+  animation: typeIn .55s steps(18, end) .15s both;
+}
+@keyframes typeIn { from { max-width: 0; } to { max-width: 100%; } }
+
+/* Los grupos entran escalonados, de a uno. */
+.group { animation: groupIn .4s ease both; }
+@keyframes groupIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.verdict-head {
+  display: flex; align-items: baseline; gap: 14px;
+  padding: 22px 24px 18px;
+}
+.verdict-label {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 1.2px;
+  color: var(--text-faint); text-transform: uppercase; flex-shrink: 0;
+}
+.verdict-level {
+  font-family: var(--mono);
+  font-size: 25px; font-weight: 700; letter-spacing: 1.5px;
+  color: var(--text-dim);
+}
+.verdict-summary {
+  color: var(--text-dim); font-size: 13.5px; padding: 0 24px 18px;
+  line-height: 1.6;
+}
+.verdict-note {
+  color: var(--sev-medium); font-size: 12.5px;
+  padding: 12px 24px; background: rgba(217,164,65,.07);
+  border-top: 1px solid var(--border-soft);
+  font-family: var(--mono); line-height: 1.55;
+}
+.verdict.level-limpio .verdict-level { color: var(--ok); }
+.verdict.level-limpio { border-color: rgba(74,160,107,.4); }
+.verdict.level-incompleto .verdict-level { color: var(--text-dim); }
+.verdict.level-sospechoso .verdict-level { color: var(--sev-medium); }
+.verdict.level-sospechoso { border-color: rgba(217,164,65,.4); }
+.verdict.level-evidencia_fuerte .verdict-level { color: var(--sev-critical); }
+.verdict.level-evidencia_fuerte { border-color: rgba(214,69,69,.45); }
+
+/* Barra de distribución: la proporción real de la evidencia. Es honesta de
+   una forma que cinco contadores sueltos no son. */
+.dist { padding: 0 24px 20px; }
+.dist-bar {
+  display: flex; height: 7px; border-radius: 4px; overflow: hidden;
+  background: var(--bg-soft); margin-bottom: 10px;
+}
+.dist-seg { height: 100%; transition: width .5s ease; }
+.dist-legend {
+  display: flex; gap: 16px; flex-wrap: wrap;
+  font-family: var(--mono); font-size: 11px;
+}
+.dist-item { display: flex; align-items: center; gap: 6px; color: var(--text-dim); }
+.dist-swatch { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.dist-num { color: var(--text); font-weight: 700; }
+
+/* ---------------- hallazgos ---------------- */
+.group {
+  margin-bottom: 8px; border: 1px solid var(--border);
+  border-radius: 8px; overflow: hidden; background: var(--bg-elev);
+}
+.group-head {
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  padding: 13px 16px; user-select: none; transition: background .15s;
+}
+.group-head:hover { background: var(--bg-soft); }
+.group-caret {
+  color: var(--text-faint); transition: transform .2s;
+  font-family: var(--mono); font-size: 10px;
+}
+.group.open .group-caret { transform: rotate(90deg); }
+.group-title { flex: 1; font-weight: 500; font-size: 14px; }
+.group-count {
+  color: var(--text-faint); font-size: 11px; font-family: var(--mono);
+}
+.group-body { display: none; }
+.group.open .group-body { display: block; }
+
+.finding {
+  display: flex; align-items: center; gap: 11px;
+  padding: 11px 16px; border-top: 1px solid var(--border-soft);
+  transition: background .15s;
+}
+.finding:hover { background: var(--bg-soft); }
+.finding-main { flex: 1; min-width: 0; }
+.finding-title { font-size: 13.5px; }
+.finding-path {
+  color: var(--text-faint); font-size: 11.5px; margin-top: 3px;
+  font-family: var(--mono);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  /* Recorta por el principio para dejar visible el nombre del archivo, que es
+     lo único que cambia entre rutas. unicode-bidi:plaintext es imprescindible:
+     con direction:rtl a secas, el algoritmo bidireccional reordena las barras
+     invertidas y las rutas se leen mal (aparece una "\" al final que no
+     existe en el dato). Con plaintext, el primer carácter fuerte decide la
+     dirección del texto y solo el recorte queda del lado izquierdo. */
+  direction: rtl; unicode-bidi: plaintext; text-align: left;
+}
+
+/* Botón de carpeta: sin borde hasta que se lo necesita. */
+.reveal {
+  flex-shrink: 0; width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 6px; border: 1px solid transparent;
+  background: transparent; color: var(--text-faint);
+  cursor: pointer; font-size: 14px; transition: all .15s;
+}
+.reveal:hover { color: var(--accent); border-color: var(--border); background: var(--bg-hi); }
+.reveal.done { color: var(--ok); }
+
+.badge {
+  font-family: var(--mono);
+  font-size: 9.5px; font-weight: 700; letter-spacing: .6px;
+  padding: 3px 7px; border-radius: 3px; text-transform: uppercase;
+  flex-shrink: 0; color: #10131a;
+}
+.sev-info { background: var(--sev-info); color: #e8eaf0; }
+.sev-low { background: var(--sev-low); color: #fff; }
+.sev-medium { background: var(--sev-medium); }
+.sev-high { background: var(--sev-high); }
+.sev-critical { background: var(--sev-critical); color: #fff; }
+
+.results-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-top: 18px; padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.report-path { color: var(--text-faint); font-size: 11.5px; font-family: var(--mono); }
+.empty { color: var(--text-faint); text-align: center; padding: 34px; font-family: var(--mono); }
+
+/* ---------------- barra de estado ---------------- */
+.statusbar {
+  flex-shrink: 0; background: var(--bg-elev);
+  border-top: 1px solid var(--border); display: none;
+}
+.statusbar.on { display: block; }
+.statusbar-track { height: 3px; background: var(--bg-soft); overflow: hidden; }
+.statusbar-fill {
+  height: 100%; width: 0%; position: relative; overflow: hidden;
+  background: var(--accent);
+  box-shadow: 0 0 12px rgba(242,128,31,.7);
+  /* Corta: el avance ahora llega cada punto porcentual, así que una
+     transición larga se solaparía consigo misma y se vería a destiempo. */
+  transition: width .25s linear;
+}
+/* Franjas en movimiento: el relleno queda quieto entre colectores, y sin
+   esto parecería trabado durante los segundos que tarda cada fuente. */
+.statusbar-fill::after {
+  content: ""; position: absolute; inset: 0;
+  background: repeating-linear-gradient(115deg,
+    rgba(255,255,255,.22) 0 8px, transparent 8px 18px);
+  animation: stripes .7s linear infinite;
+}
+@keyframes stripes {
+  0% { background-position: 0 0; }
+  100% { background-position: 40px 0; }
+}
+.statusbar-info {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 22px; font-size: 11.5px; color: var(--text-dim);
+  font-family: var(--mono);
+}
+.statusbar-current { display: flex; align-items: center; gap: 9px; }
+.statusbar-current::before {
+  content: ""; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--accent); animation: pulse 1.5s infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .2; } }
+.statusbar-right { display: flex; align-items: center; gap: 9px; }
+.statusbar-sep { color: var(--text-faint); }
+.statusbar-pct { color: var(--accent); font-weight: 700; min-width: 36px; text-align: right; }
+
+/* ---------------- responsive ---------------- */
+@media (max-width: 900px) {
+  .scan-grid { grid-template-columns: 1fr; }
+  .cols { grid-template-columns: 1fr; }
+  .live-feed { height: 46vh; }
+}

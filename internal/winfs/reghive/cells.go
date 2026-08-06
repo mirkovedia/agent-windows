@@ -170,12 +170,56 @@ func (h *Hive) readValue(offset uint32) (string, []byte, uint32) {
 		}
 		data = raw[:n]
 	} else {
-		data = h.cellBody(dataOffset)
-		if uint32(len(data)) > dataLen {
-			data = data[:dataLen]
-		}
+		data = h.readValueData(dataOffset, dataLen)
 	}
 	return name, data, dataType
+}
+
+// maxSegmentData es cuántos bytes de datos entran en un segmento de big data.
+const maxSegmentData = 16344
+
+// readValueData resuelve los datos de un valor, rearmando los segmentos cuando
+// no entran en una sola celda.
+//
+// Windows guarda los valores grandes detrás de una celda "db" que solo lista
+// los offsets de los segmentos. Sin este paso el llamador recibe el descriptor
+// en vez del contenido y lo interpreta como si fueran los datos: así fallaba
+// shimcache, que leía "db" + 18 segmentos como si fuera la firma del
+// AppCompatCache.
+func (h *Hive) readValueData(offset, dataLen uint32) []byte {
+	cell := h.cellBody(offset)
+
+	// Camino normal: los datos están en la celda directamente.
+	if len(cell) < 8 || string(cell[:2]) != "db" {
+		if uint32(len(cell)) > dataLen {
+			return cell[:dataLen]
+		}
+		return cell
+	}
+
+	segCount := int(binary.LittleEndian.Uint16(cell[2:4]))
+	list := h.cellBody(binary.LittleEndian.Uint32(cell[4:8]))
+
+	out := make([]byte, 0, dataLen)
+	for i := 0; i < segCount; i++ {
+		base := i * 4
+		if base+4 > len(list) {
+			break // lista truncada: se devuelve lo rearmado hasta acá
+		}
+		seg := h.cellBody(binary.LittleEndian.Uint32(list[base : base+4]))
+		// La celda puede estar sobredimensionada respecto de lo que aporta.
+		if len(seg) > maxSegmentData {
+			seg = seg[:maxSegmentData]
+		}
+		out = append(out, seg...)
+		if uint32(len(out)) >= dataLen {
+			break
+		}
+	}
+	if uint32(len(out)) > dataLen {
+		out = out[:dataLen]
+	}
+	return out
 }
 
 // equalFold compara nombres de clave/valor sin distinguir mayúsculas (ASCII).
